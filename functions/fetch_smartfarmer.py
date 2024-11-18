@@ -26,7 +26,7 @@ def fetch_smartfarmer(driver, user = None, pwd = None):
 
             print('SmartFarmer Anmeldung erfolgreich')
 
-        WebDriverWait(driver, 20).until(
+        WebDriverWait(driver, 30).until(
             EC.any_of(
                 EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="später"]')),
                 EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="jetzt nicht"]')),
