@@ -4,6 +4,7 @@ from pathlib import Path
 import datetime
 import platform
 import json
+from pytz import timezone
 
 import gspread
 from gspread_dataframe import set_with_dataframe
@@ -85,7 +86,7 @@ driver.quit()
 # Pivot
 tbl_pivot = last_dates.pivot(columns = 'Grund', index = ['Wiese', 'Sorte'], values = ['Tage', 'Niederschlag']).reset_index()
 
-header_line = ["Letzte Aktualisierung: ", datetime.datetime.now().replace(microsecond = 0)] + [''] * (len(tbl_pivot.columns)-2)
+header_line = ["Letzte Aktualisierung: ", datetime.datetime.now(tz = timezone('Europe/Berlin')).replace(microsecond = 0)] + [''] * (len(tbl_pivot.columns)-2)
 column_index = [(i, *j) for i, j in zip(header_line, tbl_pivot.columns.copy())]
 tbl_pivot.columns = pd.MultiIndex.from_tuples(column_index)
 
@@ -103,3 +104,5 @@ ws = gtable.worksheet("Behandlungsübersicht")
 
 set_with_dataframe(worksheet=ws, dataframe=tbl_pivot, include_index=False, include_column_header=True, resize=True)
 print('Tabelle an Google Sheets gesendet!')
+
+tbl_pivot.to_csv('tbl_pivot.csv')
