@@ -7,18 +7,31 @@ from selenium.webdriver.support import expected_conditions as EC
 def fetch_smartfarmer(driver, user = None, pwd = None):
 
     driver.get('https://app.smartfarmer.it/#/auth/welcome/')
+    time.sleep(10) #wait for page to be loaded
 
     ## Log into SmartFarmer (if needed)
     if "Bitte geben Sie Ihre E-Mail Adresse ein" in driver.page_source:
+        wait = WebDriverWait(driver, 10)
+
         ##Insert Email
+        forward_element = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="weiter ►"]')))
         driver.find_element(By.XPATH, '//input[@type="email"]').send_keys(user)
-        driver.find_element(By.XPATH, '//button[normalize-space()="weiter ►"]').click()
-        time.sleep(5)
+        forward_element.click()
 
         ##Insert Password
+        login_element = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="login"]')))
         driver.find_element(By.XPATH, '//input[@type="password"]').send_keys(pwd)
-        driver.find_element(By.XPATH, '//button[normalize-space()="login"]').click()
-        time.sleep(10)
+        login_element.click()
+
+        print('SmartFarmer Anmeldung erfolgreich')
+
+    WebDriverWait(driver, 20).until(
+        EC.any_of(
+            EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="später"]')),
+            EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="jetzt nicht"]')),
+            EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="Berichte"]')),
+        )
+    )
 
     ##Close pop-ups if present
     if "App aktualisiert" in driver.page_source:
