@@ -5,6 +5,8 @@ import datetime
 import platform
 import json
 from pytz import timezone
+from email.message import EmailMessage
+import smtplib
 
 import gspread
 from gspread_dataframe import set_with_dataframe
@@ -15,6 +17,16 @@ from selenium.webdriver.chrome.options import Options
 from functions.fetch_smartfarmer import fetch_smartfarmer
 from functions.fetch_sbr import get_br_stationdata
 from functions.reformat_tbl import reformat_tbl
+
+##Parameters
+thresholds = {'Tage': {'Apfelmehltau': 14,
+                       'Apfelschorf': 14,
+                       'Bittersalz': 21,
+                       'Ca-Düngung': 21},
+               'Niederschlag': {'Apfelmehltau': 30,
+                       'Apfelschorf': 30,
+                       'Bittersalz': 30,
+                       'Ca-Düngung': 30}}
 
 # Open webpage and load cookies
 options = Options()
@@ -63,7 +75,7 @@ try:
 except:
     pass
 
-#Get stationdata from SBR
+# Get stationdata from SBR
 start_dates = last_dates['Datum'].unique()
 months = np.unique([*start_dates.month, datetime.datetime.now().month])
 
@@ -105,4 +117,36 @@ ws = gtable.worksheet("Behandlungsübersicht")
 set_with_dataframe(worksheet=ws, dataframe=tbl_pivot, include_index=False, include_column_header=True, resize=True)
 print('Tabelle an Google Sheets gesendet!')
 
-tbl_pivot.to_csv('tbl_pivot.csv')
+##Send email
+überschreitungen = {'Tage': [], 'Niederschlag': []}
+for col1, d in thresholds.items():
+    for col, thresh in d.items():
+        if (tbl_pivot.droplevel(0, axis = 1)[col1][col] > thresh).any():
+            überschreitungen[col1].append(col)
+
+if (len(überschreitungen['Tage']) > 0) or (len(last_dates['Niederschlag']) > 0):
+
+    msg = EmailMessage()
+    msg["Subject"] = 'Pflanzenschutz Übersicht'
+    msg['From'] = 'tscholl.simon@gmail.com'
+    msg['To'] = 'tscholl.simon@gmail.com'# 'tscholl.simon@gmail.com, erlhof.latsch@gmail.com'
+
+    order_tage = tbl_pivot.droplevel(0, axis = 1)['Tage'].max(axis = 1).sort_values(ascending = False).index
+    tbl_tage = tbl_pivot.loc[order_tage].droplevel(0, axis = 1).set_index(['Wiese', 'Sorte'])['Tage'].astype(int)
+    order_n = tbl_pivot.droplevel(0, axis = 1)['Niederschlag'].max(axis = 1).sort_values(ascending = False).index
+    tbl_n = tbl_pivot.loc[order_tage].droplevel(0, axis = 1).set_index(['Wiese', 'Sorte'])['Niederschlag']
+
+    msg.set_content(
+        f"""\
+            <h2>Tage</h2>
+            {tbl_tage.to_html()}
+
+            <h2>Niederschlag</h2>
+            {tbl_n.to_html()}
+        """,
+        subtype="html",
+    )
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
+        smtp_server.login(secrets['gmail']['user'], secrets['gmail']['pwd'])
+        smtp_server.send_message(msg)
