@@ -1,10 +1,11 @@
 import time
 import datetime
+from pathlib import Path
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def fetch_smartfarmer(driver, user = None, pwd = None):
+def fetch_smartfarmer(driver, user = None, pwd = None, download_dir = None):
 
     try:
         driver.get('https://app.smartfarmer.it/#/auth/welcome/')
@@ -57,7 +58,19 @@ def fetch_smartfarmer(driver, user = None, pwd = None):
         dbutton_xpath = '/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]'
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, dbutton_xpath))).click()
 
-        time.sleep(10) #Make sure download finishes
+        if download_dir is not None:
+            time.sleep(1)
+            fsize = -100
+            while True:
+                dfiles = list(Path(download_dir).glob('*.xlsx'))
+                fsize_new = dfiles[-1].stat().st_size
+                if fsize_new != fsize:
+                    fsize = fsize_new
+                    time.sleep(1)
+                else:
+                    break
+        else:
+            time.sleep(10) #Make sure download finishes
         print('SmartFarmer Daten heruntergeladen!')
     except:
         print('Fehler beim Herunterladen von SmartFarmer. Screenshot gespeichert')
