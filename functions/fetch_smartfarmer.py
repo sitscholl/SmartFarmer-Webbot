@@ -93,6 +93,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
         else:
             time.sleep(10)
         print('SmartFarmer Daten heruntergeladen!')
-    except:
+    except Exception as e:
         print('Fehler beim Herunterladen von SmartFarmer. Screenshot gespeichert')
-        driver.save_screenshot('SmartFarmer_Error.png')
+        print(e)
+        driver.save_screenshot(f'SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
