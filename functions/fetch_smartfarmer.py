@@ -9,7 +9,17 @@ def fetch_smartfarmer(driver, user = None, pwd = None, download_dir = None):
 
     try:
         driver.get('https://app.smartfarmer.it/#/auth/welcome/')
-        time.sleep(10) #wait for page to be loaded
+
+        ##Wait for page to be loaded
+        psource = driver.execute_script("return document.documentElement.outerHTML")
+        time.sleep(2)
+        while True:
+            psource_new = driver.execute_script("return document.documentElement.outerHTML")
+            if psource != psource_new:
+                psource = psource_new
+                time.sleep(2)
+            else:
+                break
 
         ## Log into SmartFarmer (if needed)
         if "Bitte geben Sie Ihre E-Mail Adresse ein" in driver.page_source:
@@ -47,17 +57,29 @@ def fetch_smartfarmer(driver, user = None, pwd = None, download_dir = None):
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '//div[normalize-space()="Liste"]'))).click()
 
         ##Jahr auswählen
-        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Erntejahr")]'))).click()
+        WebDriverWait(driver, 20).until(EC.any_of(
+            EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Erntejahr")]')),
+            EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Kalenderjahr")]'))
+            )).click()
         year_to_download = datetime.datetime.now().year - (datetime.datetime.now().month < 3) #only from march onwards use next year
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, f'//span[normalize-space()="Kalenderjahr {year_to_download}"]'))).click()
 
         ##Wait for all entries to load, also new journal entries
-        time.sleep(10)
+        psource = driver.execute_script("return document.documentElement.outerHTML")
+        time.sleep(1)
+        while True:
+            psource_new = driver.execute_script("return document.documentElement.outerHTML")
+            if psource != psource_new:
+                psource = psource_new
+                time.sleep(1)
+            else:
+                break
 
         ##Click on download button
         dbutton_xpath = '/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]'
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, dbutton_xpath))).click()
 
+        #Make sure download finishes
         if download_dir is not None:
             time.sleep(1)
             fsize = -100
@@ -70,7 +92,7 @@ def fetch_smartfarmer(driver, user = None, pwd = None, download_dir = None):
                 else:
                     break
         else:
-            time.sleep(10) #Make sure download finishes
+            time.sleep(10)
         print('SmartFarmer Daten heruntergeladen!')
     except:
         print('Fehler beim Herunterladen von SmartFarmer. Screenshot gespeichert')
