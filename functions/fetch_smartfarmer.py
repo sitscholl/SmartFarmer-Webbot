@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def fetch_smartfarmer(driver, user = None, pwd = None, download_dir = None):
+def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None):
 
     try:
         driver.get('https://app.smartfarmer.it/#/auth/welcome/')
@@ -61,8 +61,7 @@ def fetch_smartfarmer(driver, user = None, pwd = None, download_dir = None):
             EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Erntejahr")]')),
             EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Kalenderjahr")]'))
             )).click()
-        year_to_download = datetime.datetime.now().year - (datetime.datetime.now().month < 3) #only from march onwards use next year
-        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, f'//span[normalize-space()="Kalenderjahr {year_to_download}"]'))).click()
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, f'//span[normalize-space()="Kalenderjahr {jahr}"]'))).click()
 
         ##Wait for all entries to load, also new journal entries
         psource = driver.execute_script("return document.documentElement.outerHTML")

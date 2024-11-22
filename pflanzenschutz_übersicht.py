@@ -19,6 +19,7 @@ from functions.fetch_sbr import get_br_stationdata
 from functions.reformat_tbl import reformat_tbl
 
 ##Parameters
+jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
 thresholds = {'Tage': {'Apfelmehltau': 14,
                        'Apfelschorf': 14,
                        'Bittersalz': 21,
@@ -64,7 +65,7 @@ if platform.uname().system != 'Windows':
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
 
 ## Download table from smartfarmer
-fetch_smartfarmer(driver, user = secrets['smartfarmer']['user'], pwd = secrets['smartfarmer']['pwd'], download_dir = download_dir)
+fetch_smartfarmer(driver, jahr, user = secrets['smartfarmer']['user'], pwd = secrets['smartfarmer']['pwd'], download_dir = download_dir)
 
 ## Open in pandas
 last_dates = reformat_tbl(download_dir)
@@ -79,7 +80,7 @@ except:
 start_dates = last_dates['Datum'].unique()
 months = np.unique([*start_dates.month, datetime.datetime.now().month])
 
-stationdata = get_br_stationdata(driver, months = months, user = secrets['sbr']['user'], pwd = secrets['sbr']['pwd'])
+stationdata = get_br_stationdata(driver, jahr, months = months, user = secrets['sbr']['user'], pwd = secrets['sbr']['pwd'])
 
 if stationdata is not None:
     sums = []
