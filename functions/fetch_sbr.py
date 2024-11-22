@@ -13,7 +13,7 @@ def get_br_stationdata(driver, jahr, station_id = "103", months = np.arange(4, 9
     driver.get('https://www3.beratungsring.org/')
 
     ## Log in (if needed)
-    if driver.find_elements(By.XPATH, '//a[@class="login-link"]'):
+    if driver.find_elements(By.XPATH, '//span[normalize-space()="Login"]'):
         try:
             driver.find_element(By.XPATH, '//a[@class="login-link"]').click()
             ##Insert Email
