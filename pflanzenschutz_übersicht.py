@@ -80,7 +80,11 @@ except:
 start_dates = last_dates['Datum'].unique()
 months = np.unique([*start_dates.month, datetime.datetime.now().month])
 
-stationdata = get_br_stationdata(driver, jahr, months = months, user = secrets['sbr']['user'], pwd = secrets['sbr']['pwd'])
+try:
+    stationdata = get_br_stationdata(driver, jahr, months = months, user = secrets['sbr']['user'], pwd = secrets['sbr']['pwd'])
+except Exception as e:
+    stationdata = None
+    print(e)
 
 if stationdata is not None:
     sums = []
