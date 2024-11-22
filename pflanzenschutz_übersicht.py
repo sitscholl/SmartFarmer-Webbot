@@ -64,7 +64,7 @@ if platform.uname().system != 'Windows':
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
 
 ## Download table from smartfarmer
-fetch_smartfarmer(driver, user = secrets['smartfarmer']['user'], pwd = secrets['smartfarmer']['pwd'])
+fetch_smartfarmer(driver, user = secrets['smartfarmer']['user'], pwd = secrets['smartfarmer']['pwd'], download_dir = download_dir)
 
 ## Open in pandas
 last_dates = reformat_tbl(download_dir)
