@@ -1,6 +1,7 @@
 import time
 import datetime
 from pathlib import Path
+from pytz import timezone
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -80,20 +81,19 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
 
         #Make sure download finishes
         if download_dir is not None:
-            time.sleep(1)
-            fsize = -100
-            while True:
+            start_time = datetime.datetime.now(tz = timezone('Europe/Berlin'))
+            while (datetime.datetime.now(tz = timezone('Europe/Berlin')) - start_time).total_seconds() < 60:
                 dfiles = list(Path(download_dir).glob('*.xlsx'))
-                fsize_new = dfiles[-1].stat().st_size
-                if fsize_new != fsize:
-                    fsize = fsize_new
-                    time.sleep(1)
-                else:
-                    break
+                if len(dfiles) > 0:
+                    newest_ctime = datetime.datetime.fromtimestamp(dfiles[-1].stat().st_birthtime, tz = timezone('Europe/Berlin'))
+                    if (datetime.datetime.now(tz = timezone('Europe/Berlin')) - newest_ctime).total_seconds() < 10:
+                        break
         else:
             time.sleep(10)
         print('SmartFarmer Daten heruntergeladen!')
+        return(True)
     except Exception as e:
         print('Fehler beim Herunterladen von SmartFarmer. Screenshot gespeichert')
         print(e)
         driver.save_screenshot(f'SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
+        return(False)

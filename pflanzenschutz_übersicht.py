@@ -7,6 +7,7 @@ from pytz import timezone
 from email.message import EmailMessage
 import smtplib
 import os
+import sys
 from dotenv import load_dotenv
 
 import gspread
@@ -65,7 +66,16 @@ if platform.uname().system != 'Windows':
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
 
 ## Download table from smartfarmer
-fetch_smartfarmer(driver, jahr, user =os.environ.get('SM_USERNAME'), pwd = os.environ.get('SM_PASSWORD'), download_dir = download_dir)
+sm_download = fetch_smartfarmer(
+    driver,
+    jahr,
+    user=os.environ.get("SM_USERNAME"),
+    pwd=os.environ.get("SM_PASSWORD"),
+    download_dir=download_dir,
+)
+
+if not sm_download:
+    sys.exit()
 
 ## Open in pandas
 last_dates = reformat_tbl(download_dir)
