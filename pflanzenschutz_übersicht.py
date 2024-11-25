@@ -3,10 +3,11 @@ import pandas as pd
 from pathlib import Path
 import datetime
 import platform
-import json
 from pytz import timezone
 from email.message import EmailMessage
 import smtplib
+import os
+from dotenv import load_dotenv
 
 import gspread
 from gspread_dataframe import set_with_dataframe
@@ -28,6 +29,8 @@ thresholds = {'Tage': {'Apfelmehltau': 14,
                        'Apfelschorf': 30,
                        'Bittersalz': 30,
                        'Ca-Düngung': 30}}
+
+load_dotenv("credentials.env")
 
 # Open webpage and load cookies
 options = Options()
@@ -53,9 +56,6 @@ prefs = {
 }
 options.add_experimental_option("prefs", prefs)
 
-with open('secrets.json') as f:
-    secrets = json.load(f)
-
 ## Open Browser
 driver = webdriver.Chrome(options=options)
 
@@ -65,7 +65,7 @@ if platform.uname().system != 'Windows':
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
 
 ## Download table from smartfarmer
-fetch_smartfarmer(driver, jahr, user = secrets['smartfarmer']['user'], pwd = secrets['smartfarmer']['pwd'], download_dir = download_dir)
+fetch_smartfarmer(driver, jahr, user =os.environ.get('SM_USERNAME'), pwd = os.environ.get('SM_PASSWORD'), download_dir = download_dir)
 
 ## Open in pandas
 last_dates = reformat_tbl(download_dir)
@@ -81,7 +81,7 @@ start_dates = last_dates['Datum'].unique()
 months = np.unique([*start_dates.month, datetime.datetime.now().month])
 
 try:
-    stationdata = get_br_stationdata(driver, jahr, months = months, user = secrets['sbr']['user'], pwd = secrets['sbr']['pwd'])
+    stationdata = get_br_stationdata(driver, jahr, months = months, user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'))
 except Exception as e:
     stationdata = None
     print(e)
@@ -153,5 +153,5 @@ if (len(überschreitungen['Tage']) > 0) or (len(last_dates['Niederschlag']) > 0)
     )
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
-        smtp_server.login(secrets['gmail']['user'], secrets['gmail']['pwd'])
+        smtp_server.login(os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY'))
         smtp_server.send_message(msg)
