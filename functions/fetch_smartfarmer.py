@@ -85,7 +85,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
             while (datetime.datetime.now(tz = timezone('Europe/Berlin')) - start_time).total_seconds() < 60:
                 dfiles = list(Path(download_dir).glob('*.xlsx'))
                 if len(dfiles) > 0:
-                    newest_ctime = datetime.datetime.fromtimestamp(dfiles[-1].stat().st_birthtime, tz = timezone('Europe/Berlin'))
+                    newest_ctime = datetime.datetime.fromtimestamp(dfiles[-1].stat().st_ctime, tz = timezone('Europe/Berlin'))
                     if (datetime.datetime.now(tz = timezone('Europe/Berlin')) - newest_ctime).total_seconds() < 10:
                         break
         else:
