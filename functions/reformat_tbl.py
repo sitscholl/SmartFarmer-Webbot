@@ -21,7 +21,7 @@ def reformat_tbl(dir):
     tbl['Grund'] = tbl['Grund'].str.split(', ')
     tbl = tbl.explode('Grund')
 
-    last_dates = tbl.groupby(['Wiese', 'Sorte', 'Grund'], as_index = False)['Datum'].max()
+    last_dates = tbl.groupby(['Wiese', 'Sorte', 'Mittel', 'Grund'], as_index = False)['Datum'].max()
     last_dates = last_dates.loc[last_dates['Grund'].isin(["Apfelmehltau", "Apfelschorf", "Ca-Düngung", "Bittersalz"])]
 
     last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1)) #transform to unit of days

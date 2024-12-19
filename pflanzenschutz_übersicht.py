@@ -32,6 +32,8 @@ thresholds = {'Tage': {'Apfelmehltau': 14,
                        'Ca-Düngung': 30}}
 
 load_dotenv("credentials.env")
+tbl_mittel = pd.read_csv('data/pflanzenschutzmittel.csv', encoding = 'latin-1')
+default_mm = 30
 
 # Open webpage and load cookies
 options = Options()
@@ -47,9 +49,13 @@ if platform.uname().system != 'Windows':
     options.add_argument('--dns-prefetch-disable')
 
 if platform.uname().system == 'Windows':
-    options.add_argument(f"user-data-dir={Path.cwd()}\\user_dir")
+    download_dir = f"{Path.cwd()}\\downloads"
+    user_dir = f"{Path.cwd()}\\user_dir"
+else:
+    download_dir = 'downloads'
+    user_dir = 'user_dir'
 
-download_dir = f"{Path.cwd()}\\downloads"
+options.add_argument(f"user-data-dir={user_dir}")
 prefs = {
     "download.default_directory": download_dir,
     "download.directory_upgrade": True,
@@ -79,6 +85,15 @@ if not sm_download:
 
 ## Open in pandas
 last_dates = reformat_tbl(download_dir)
+last_dates = last_dates.merge(tbl_mittel, on = 'Mittel', how = 'left')
+
+mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit'].isna(), 'Mittel'].unique())
+if len(mittel_fehlend) > 0:
+    print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von 30mm angenommen: \n{', '.join(mittel_fehlend)}")
+last_dates['Regenbestaendigkeit'] = last_dates['Regenbestaendigkeit'].fillna(default_mm)
+
+##Drop entries with multiple Mittel and keep only one with longest?? Regenbestaendigkeit
+last_dates = last_dates.sort_values('Regenbestaendigkeit', ascending = False).drop_duplicates(subset = ['Wiese', 'Sorte', 'Grund'])
 
 ##Delete downloaded files
 try:
@@ -109,6 +124,9 @@ else:
 
 ## Close driver
 driver.quit()
+
+##Calculate % of Regenbeständigkeit
+last_dates['p_regen'] = ((last_dates['Niederschlag'] / last_dates['Regenbestaendigkeit']) * 100).round(1)
 
 # Pivot
 tbl_pivot = last_dates.pivot(columns = 'Grund', index = ['Wiese', 'Sorte'], values = ['Tage', 'Niederschlag']).reset_index()
