@@ -72,15 +72,19 @@ if platform.uname().system != 'Windows':
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
 
 ## Download table from smartfarmer
-sm_download = fetch_smartfarmer(
-    driver,
-    jahr,
-    user=os.environ.get("SM_USERNAME"),
-    pwd=os.environ.get("SM_PASSWORD"),
-    download_dir=download_dir,
-)
-
-if not sm_download:
+try:
+    fetch_smartfarmer(
+        driver,
+        jahr,
+        user=os.environ.get("SM_USERNAME"),
+        pwd=os.environ.get("SM_PASSWORD"),
+        download_dir=download_dir,
+    )
+except Exception as e:
+    print('Smartfarmer Download Fehlgeschlagen.')
+    print(e)
+    driver.save_screenshot(f'SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
+    
     sys.exit()
 
 ## Open in pandas
@@ -109,6 +113,7 @@ try:
     stationdata = get_br_stationdata(driver, jahr, months = months, user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'))
 except Exception as e:
     stationdata = None
+    print('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.')
     print(e)
 
 if stationdata is not None:
@@ -118,7 +123,6 @@ if stationdata is not None:
     sums = pd.DataFrame({'Datum': start_dates, 'Niederschlag': sums})
 
     last_dates = last_dates.merge(sums, on = 'Datum', how = 'left')
-
 else:
     last_dates['Niederschlag'] = np.nan
 
