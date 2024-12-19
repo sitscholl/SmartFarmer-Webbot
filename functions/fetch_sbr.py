@@ -12,6 +12,17 @@ def get_br_stationdata(driver, jahr, station_id = "103", months = np.arange(4, 9
     ## Open Browser
     driver.get('https://www3.beratungsring.org/')
 
+    ##Wait for page to be loaded
+    psource = driver.execute_script("return document.documentElement.outerHTML")
+    time.sleep(2)
+    while True:
+        psource_new = driver.execute_script("return document.documentElement.outerHTML")
+        if psource != psource_new:
+            psource = psource_new
+            time.sleep(2)
+        else:
+            break
+
     ## Log in (if needed)
     if driver.find_elements(By.XPATH, '//span[normalize-space()="Login"]'):
 
