@@ -9,6 +9,7 @@ import smtplib
 import os
 import sys
 from dotenv import load_dotenv
+from xlsx2csv import Xlsx2csv
 
 import gspread
 from gspread_dataframe import set_with_dataframe
@@ -18,7 +19,7 @@ from selenium.webdriver.chrome.options import Options
 
 from functions.fetch_smartfarmer import fetch_smartfarmer
 from functions.fetch_sbr import get_br_stationdata
-from functions.reformat_tbl import reformat_tbl
+from functions.get_last_dates import get_last_dates
 
 ##Parameters
 jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
@@ -88,7 +89,17 @@ except Exception as e:
     sys.exit()
 
 ## Open in pandas
-last_dates = reformat_tbl(download_dir)
+filename = sorted(list(Path(download_dir).glob('*.xlsx')), key = lambda x: x.stat().st_ctime)[-1]
+csv_name = str(filename).replace('.xlsx', '.csv')
+Xlsx2csv(filename, outputencoding="latin-1").convert(csv_name)
+tbl_sm = pd.read_csv(csv_name, encoding = 'latin-1')
+
+## Delete downloaded files
+filename.unlink()
+Path(csv_name).unlink()
+
+## Calculate last date of Behandlung
+last_dates = get_last_dates(tbl_sm)
 last_dates = last_dates.merge(tbl_mittel, on = 'Mittel', how = 'left')
 
 mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit'].isna(), 'Mittel'].unique())
@@ -98,12 +109,6 @@ last_dates['Regenbestaendigkeit'] = last_dates['Regenbestaendigkeit'].fillna(def
 
 ##Drop entries with multiple Mittel and keep only one with longest?? Regenbestaendigkeit
 last_dates = last_dates.sort_values('Regenbestaendigkeit', ascending = False).drop_duplicates(subset = ['Wiese', 'Sorte', 'Grund'])
-
-##Delete downloaded files
-try:
-    [i.unlink() for i in Path(download_dir).glob('*[.csv .xlsx]')]
-except:
-    pass
 
 # Get stationdata from SBR
 start_dates = last_dates['Datum'].unique()
