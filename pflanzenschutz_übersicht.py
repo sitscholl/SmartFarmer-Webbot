@@ -20,9 +20,13 @@ from selenium.webdriver.chrome.options import Options
 from functions.fetch_smartfarmer import fetch_smartfarmer
 from functions.fetch_sbr import get_br_stationdata
 from functions.get_last_dates import get_last_dates
+from functions.format_tbl import format_tbl
 
 ##Parameters
 jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
+default_mm = 30
+default_days = 14
+mode = 'full'
 thresholds = {'Tage': {'Apfelmehltau': 14,
                        'Apfelschorf': 14,
                        'Bittersalz': 21,
@@ -34,7 +38,7 @@ thresholds = {'Tage': {'Apfelmehltau': 14,
 
 load_dotenv("credentials.env")
 tbl_mittel = pd.read_csv('data/pflanzenschutzmittel.csv', encoding = 'latin-1')
-default_mm = 30
+tbl_mittel['Behandlungsintervall'] = default_days #replace with actual Behandlungsintervall per sorte that is joined to tbl_mittel
 
 # Open webpage and load cookies
 options = Options()
@@ -102,10 +106,16 @@ Path(csv_name).unlink()
 last_dates = get_last_dates(tbl_sm)
 last_dates = last_dates.merge(tbl_mittel, on = 'Mittel', how = 'left')
 
+## Fill missing values
 mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit'].isna(), 'Mittel'].unique())
 if len(mittel_fehlend) > 0:
-    print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von 30mm angenommen: \n{', '.join(mittel_fehlend)}")
+    print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{', '.join(mittel_fehlend)}")
 last_dates['Regenbestaendigkeit'] = last_dates['Regenbestaendigkeit'].fillna(default_mm)
+
+tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall'].isna(), 'Mittel'].unique())
+if len(tage_fehlend) > 0:
+    print(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{', '.join(tage_fehlend)}")
+last_dates['Behandlungsintervall'] = last_dates['Behandlungsintervall'].fillna(default_days)
 
 ##Drop entries with multiple Mittel and keep only one with longest?? Regenbestaendigkeit
 last_dates = last_dates.sort_values('Regenbestaendigkeit', ascending = False).drop_duplicates(subset = ['Wiese', 'Sorte', 'Grund'])
@@ -134,15 +144,27 @@ else:
 ## Close driver
 driver.quit()
 
-##Calculate % of Regenbeständigkeit
-last_dates['p_regen'] = ((last_dates['Niederschlag'] / last_dates['Regenbestaendigkeit']) * 100).round(1)
+##Reformat table for output (round directly at beginning and use variable to determine precision)
+tbl_abs = (
+    last_dates.pivot(
+        columns="Grund", index=["Wiese", "Sorte"], values=["Tage", "Niederschlag"]
+    )
+    .round(0)
+    .astype(int)
+)
+tbl_thresh = (
+    last_dates.pivot(
+        columns="Grund",
+        index=["Wiese", "Sorte"],
+        values=["Behandlungsintervall", "Regenbestaendigkeit"],
+    )
+    .rename(columns={"Regenbestaendigkeit": "Niederschlag", "Behandlungsintervall": "Tage"}, level=0)
+    .round(0)
+    .astype(int)
+)
+tbl_perc = ((tbl_abs / tbl_thresh) * 100).round(0).astype(int)
+tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh.astype(str) + ' (' + tbl_perc.astype(str) + '%)'
 
-# Pivot
-tbl_pivot = last_dates.pivot(columns = 'Grund', index = ['Wiese', 'Sorte'], values = ['Tage', 'Niederschlag']).reset_index()
-
-header_line = ["Letzte Aktualisierung: ", datetime.datetime.now(tz = timezone('Europe/Berlin')).replace(microsecond = 0)] + [''] * (len(tbl_pivot.columns)-2)
-column_index = [(i, *j) for i, j in zip(header_line, tbl_pivot.columns.copy())]
-tbl_pivot.columns = pd.MultiIndex.from_tuples(column_index)
 
 # Send to google sheets
 scope = [
@@ -156,39 +178,34 @@ client = gspread.service_account(filename = 'gcloud_key.json', scopes = scope)
 gtable = client.open("Behandlungsübersicht")
 ws = gtable.worksheet("Behandlungsübersicht")
 
-set_with_dataframe(worksheet=ws, dataframe=tbl_pivot, include_index=False, include_column_header=True, resize=True)
+set_with_dataframe(worksheet=ws, dataframe=tbl_string, include_index=True, include_column_header=True, resize=True)
 print('Tabelle an Google Sheets gesendet!')
 
 ##Send email
-überschreitungen = {'Tage': [], 'Niederschlag': []}
-for col1, d in thresholds.items():
-    for col, thresh in d.items():
-        if (tbl_pivot.droplevel(0, axis = 1)[col1][col] > thresh).any():
-            überschreitungen[col1].append(col)
+msg = EmailMessage()
+msg["Subject"] = 'Pflanzenschutz Übersicht'
+msg['From'] = 'tscholl.simon@gmail.com'
+msg['To'] = 'tscholl.simon@gmail.com'# 'tscholl.simon@gmail.com, erlhof.latsch@gmail.com'
 
-if (len(überschreitungen['Tage']) > 0) or (len(last_dates['Niederschlag']) > 0):
+params = np.unique(tbl_string.columns.get_level_values(0))
+msg.set_content(
+    "".join(
+        [
+            f"""\
+        <h2>{param}</h2>
+        {tbl_string[param].style.pipe(
+                        format_tbl,
+                        tbl_perc=tbl_perc['Tage'],
+                        caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}",
+                    ).to_html()}
 
-    msg = EmailMessage()
-    msg["Subject"] = 'Pflanzenschutz Übersicht'
-    msg['From'] = 'tscholl.simon@gmail.com'
-    msg['To'] = 'tscholl.simon@gmail.com'# 'tscholl.simon@gmail.com, erlhof.latsch@gmail.com'
+    """
+            for param in params
+        ]
+    ),
+    subtype="html",
+)
 
-    order_tage = tbl_pivot.droplevel(0, axis = 1)['Tage'].max(axis = 1).sort_values(ascending = False).index
-    tbl_tage = tbl_pivot.loc[order_tage].droplevel(0, axis = 1).set_index(['Wiese', 'Sorte'])['Tage'].astype(int)
-    order_n = tbl_pivot.droplevel(0, axis = 1)['Niederschlag'].max(axis = 1).sort_values(ascending = False).index
-    tbl_n = tbl_pivot.loc[order_tage].droplevel(0, axis = 1).set_index(['Wiese', 'Sorte'])['Niederschlag']
-
-    msg.set_content(
-        f"""\
-            <h2>Tage</h2>
-            {tbl_tage.to_html()}
-
-            <h2>Niederschlag</h2>
-            {tbl_n.to_html()}
-        """,
-        subtype="html",
-    )
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
-        smtp_server.login(os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY'))
-        smtp_server.send_message(msg)
+with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
+    smtp_server.login(os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY'))
+    smtp_server.send_message(msg)
