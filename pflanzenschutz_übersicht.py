@@ -3,16 +3,10 @@ import pandas as pd
 from pathlib import Path
 import datetime
 import platform
-from pytz import timezone
-from email.message import EmailMessage
-import smtplib
 import os
 import sys
 from dotenv import load_dotenv
 from xlsx2csv import Xlsx2csv
-
-import gspread
-from gspread_dataframe import set_with_dataframe
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -20,7 +14,8 @@ from selenium.webdriver.chrome.options import Options
 from functions.fetch_smartfarmer import fetch_smartfarmer
 from functions.fetch_sbr import get_br_stationdata
 from functions.get_last_dates import get_last_dates
-from functions.format_tbl import format_tbl
+from functions.google import send_mail, send_sheets
+
 
 ##Parameters
 jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
@@ -166,46 +161,9 @@ tbl_perc = ((tbl_abs / tbl_thresh) * 100).round(0).astype(int)
 tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh.astype(str) + ' (' + tbl_perc.astype(str) + '%)'
 
 
-# Send to google sheets
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/drive",
-]
-
-client = gspread.service_account(filename = 'gcloud_key.json', scopes = scope)
-gtable = client.open("Behandlungsübersicht")
-ws = gtable.worksheet("Behandlungsübersicht")
-
-set_with_dataframe(worksheet=ws, dataframe=tbl_string, include_index=True, include_column_header=True, resize=True)
-print('Tabelle an Google Sheets gesendet!')
+##Send to gsheets
+send_sheets(tbl_string)
 
 ##Send email
-msg = EmailMessage()
-msg["Subject"] = 'Pflanzenschutz Übersicht'
-msg['From'] = 'tscholl.simon@gmail.com'
-msg['To'] = 'tscholl.simon@gmail.com'# 'tscholl.simon@gmail.com, erlhof.latsch@gmail.com'
-
-params = np.unique(tbl_string.columns.get_level_values(0))
-msg.set_content(
-    "".join(
-        [
-            f"""\
-        <h2>{param}</h2>
-        {tbl_string[param].style.pipe(
-                        format_tbl,
-                        tbl_perc=tbl_perc['Tage'],
-                        caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}",
-                    ).to_html()}
-
-    """
-            for param in params
-        ]
-    ),
-    subtype="html",
-)
-
-with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
-    smtp_server.login(os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY'))
-    smtp_server.send_message(msg)
+user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
+send_mail(tbl_string, tbl_perc, user, pwd)
