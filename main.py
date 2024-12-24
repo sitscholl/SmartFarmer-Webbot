@@ -7,6 +7,7 @@ import os
 import sys
 from dotenv import load_dotenv
 from xlsx2csv import Xlsx2csv
+from pytz import timezone
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -16,11 +17,14 @@ from functions.fetch_sbr import get_br_stationdata
 from functions.get_last_dates import get_last_dates
 from functions.google import send_mail, send_sheets
 
+from functions.format_tbl import format_tbl
 
 ##Parameters
 jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
 default_mm = 30
 default_days = 14
+t1_factor = 0.75
+jahreszeit = 'Frühjahr'#['Frühjahr', 'Vorblüte', 'Nachblüte', 'Sommer'] #determine dynamically from current date or from date of spritzung?
 mode = 'full'
 thresholds = {'Tage': {'Apfelmehltau': 14,
                        'Apfelschorf': 14,
@@ -32,8 +36,24 @@ thresholds = {'Tage': {'Apfelmehltau': 14,
                        'Ca-Düngung': 30}}
 
 load_dotenv("credentials.env")
-tbl_mittel = pd.read_csv('data/pflanzenschutzmittel.csv', encoding = 'latin-1')
-tbl_mittel['Behandlungsintervall'] = default_days #replace with actual Behandlungsintervall per sorte that is joined to tbl_mittel
+tbl_regenbestaendigkeit = pd.read_csv('data/regenbestaendigkeit.csv', encoding = 'latin-1').rename(columns={'Regenbestaendigkeit': 'Regenbestaendigkeit_max'})
+tbl_regenbestaendigkeit['Regenbestaendigkeit_min'] = tbl_regenbestaendigkeit['Regenbestaendigkeit_max'] * t1_factor
+# tbl_mittel['Behandlungsintervall'] = default_days #replace with actual Behandlungsintervall per sorte that is joined to tbl_mittel
+tbl_anfaelligkeit = pd.read_csv("data/sortenanfaelligkeit.csv", encoding="latin-1")
+tbl_behandlungsintervall = (
+    pd.read_csv("data/behandlungsintervall.csv", encoding="latin-1", sep="\t")
+    .melt(
+        id_vars=["Mittel", "Jahreszeit", "Range"],
+        var_name="Mehltauanfälligkeit",
+        value_name="Behandlungsintervall",
+    )
+    .merge(tbl_anfaelligkeit, on="Mehltauanfälligkeit")
+    .query(f"Jahreszeit == '{jahreszeit}'")
+    .pivot(columns = 'Range', values = 'Behandlungsintervall', index = ['Mittel', 'Sorte'])
+    .reset_index()
+    .rename(columns = {'min': 'Behandlungsintervall_min', 'max': 'Behandlungsintervall_max'})
+)
+
 
 # Open webpage and load cookies
 options = Options()
@@ -98,22 +118,29 @@ filename.unlink()
 Path(csv_name).unlink()
 
 ## Calculate last date of Behandlung
-last_dates = get_last_dates(tbl_sm)
-last_dates = last_dates.merge(tbl_mittel, on = 'Mittel', how = 'left')
+last_dates = get_last_dates(tbl_sm.copy()) #move calculation of Tage out of function
+last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1)) #transform to unit of days
 
-## Fill missing values
-mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit'].isna(), 'Mittel'].unique())
+## Add Regenbeständigkeit
+last_dates = last_dates.merge(tbl_regenbestaendigkeit[['Mittel', 'Regenbestaendigkeit_min', 'Regenbestaendigkeit_max']], on = 'Mittel', how = 'left', validate = 'many_to_one')
+
+mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit_max'].isna(), 'Mittel'].unique())
 if len(mittel_fehlend) > 0:
     print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{', '.join(mittel_fehlend)}")
-last_dates['Regenbestaendigkeit'] = last_dates['Regenbestaendigkeit'].fillna(default_mm)
+last_dates['Regenbestaendigkeit_max'] = last_dates['Regenbestaendigkeit_max'].fillna(default_mm)
+last_dates['Regenbestaendigkeit_min'] = last_dates['Regenbestaendigkeit_min'].fillna((last_dates['Regenbestaendigkeit_max'] * t1_factor))
 
-tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall'].isna(), 'Mittel'].unique())
+## Add Behandlungsintervall
+last_dates = last_dates.merge(tbl_behandlungsintervall[['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max']], on = ['Mittel', 'Sorte'], how = 'left', validate = 'many_to_one')
+
+tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall_max'].isna(), 'Mittel'].unique())
 if len(tage_fehlend) > 0:
     print(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{', '.join(tage_fehlend)}")
-last_dates['Behandlungsintervall'] = last_dates['Behandlungsintervall'].fillna(default_days)
+last_dates['Behandlungsintervall_max'] = last_dates['Behandlungsintervall_max'].fillna(default_days)
+last_dates['Behandlungsintervall_min'] = last_dates['Behandlungsintervall_min'].fillna((last_dates['Behandlungsintervall_max'] * t1_factor).round(0))
 
 ##Drop entries with multiple Mittel and keep only one with longest?? Regenbestaendigkeit
-last_dates = last_dates.sort_values('Regenbestaendigkeit', ascending = False).drop_duplicates(subset = ['Wiese', 'Sorte', 'Grund'])
+last_dates = last_dates.sort_values('Regenbestaendigkeit_max', ascending = False).drop_duplicates(subset = ['Wiese', 'Sorte', 'Grund'])
 
 # Get stationdata from SBR
 start_dates = last_dates['Datum'].unique()
@@ -147,23 +174,46 @@ tbl_abs = (
     .round(0)
     .astype(int)
 )
-tbl_thresh = (
+tbl_thresh_max = (
     last_dates.pivot(
         columns="Grund",
         index=["Wiese", "Sorte"],
-        values=["Behandlungsintervall", "Regenbestaendigkeit"],
+        values=["Behandlungsintervall_max", "Regenbestaendigkeit_max"],
     )
-    .rename(columns={"Regenbestaendigkeit": "Niederschlag", "Behandlungsintervall": "Tage"}, level=0)
+    .rename(columns={"Regenbestaendigkeit_max": "Niederschlag", "Behandlungsintervall_max": "Tage"}, level=0)
     .round(0)
     .astype(int)
 )
-tbl_perc = ((tbl_abs / tbl_thresh) * 100).round(0).astype(int)
-tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh.astype(str) + ' (' + tbl_perc.astype(str) + '%)'
+tbl_thresh_min = (
+    last_dates.pivot(
+        columns="Grund",
+        index=["Wiese", "Sorte"],
+        values=["Behandlungsintervall_min", "Regenbestaendigkeit_min"],
+    )
+    .rename(columns={"Regenbestaendigkeit_min": "Niederschlag", "Behandlungsintervall_min": "Tage"}, level=0)
+    .round(0)
+    .astype(int)
+)
+tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(int)
+tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_perc.astype(str) + '%)'
 
+# tbl_formatted = format_tbl(tbl_string, tbl_abs, t1 = tbl_thresh_min, t2 = tbl_thresh_max, caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}")
 
 ##Send to gsheets
 send_sheets(tbl_string)
 
 ##Send email
+params = np.unique(tbl_string.columns.get_level_values(0))
+caption = f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}"
+msg_html = "".join(
+    [
+    f"""\
+    <h2>{param}</h2>
+    {format_tbl(tbl_string[param], tbl_abs[param], tbl_thresh_min[param], tbl_thresh_max[param]).to_html()}
+    """
+    for param in params
+    ]
+)
+
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
-send_mail(tbl_string, tbl_perc, user, pwd)
+send_mail(msg_html, user, pwd)
