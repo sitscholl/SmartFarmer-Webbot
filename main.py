@@ -13,7 +13,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 from functions.fetch_smartfarmer import fetch_smartfarmer
-from functions.fetch_sbr import get_br_stationdata
+from functions.fetch_sbr import export_sbr, open_sbr_export
 from functions.get_last_dates import get_last_dates
 from functions.google import send_mail, send_sheets
 
@@ -144,10 +144,12 @@ last_dates = last_dates.sort_values('Regenbestaendigkeit_max', ascending = False
 
 # Get stationdata from SBR
 start_dates = last_dates['Datum'].unique()
-months = np.unique([*start_dates.month, datetime.datetime.now().month])
 
 try:
-    stationdata = get_br_stationdata(driver, jahr, months = months, user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'))
+    sbr_start = last_dates['Datum'].min().strftime('%d.%m.%Y')
+    sbr_end = datetime.datetime(2024,12,31).strftime('%d.%m.%Y')#datetime.datetime.now().strftime('%d.%m.%Y')
+    sbr_files = export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'))
+    stationdata = pd.concat([open_sbr_export(Path(download_dir, i)) for i in sbr_files])
 except Exception as e:
     stationdata = None
     print('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.')
@@ -156,7 +158,7 @@ except Exception as e:
 if stationdata is not None:
     sums = []
     for start in start_dates:
-        sums.append(stationdata.loc[(stationdata['Datum'] >= start) & (stationdata['Datum'] < datetime.datetime.now()), 'Niederschl. (mm)'].sum())
+        sums.append(stationdata.loc[(stationdata['datetime'] >= start) & (stationdata['datetime'] < datetime.datetime.now()), 'niederschl'].sum())
     sums = pd.DataFrame({'Datum': start_dates, 'Niederschlag': sums})
 
     last_dates = last_dates.merge(sums, on = 'Datum', how = 'left')
@@ -166,7 +168,7 @@ else:
 ## Close driver
 driver.quit()
 
-##Reformat table for output (round directly at beginning and use variable to determine precision)
+##Reformat table for output
 tbl_abs = (
     last_dates.pivot(
         columns="Grund", index=["Wiese", "Sorte"], values=["Tage", "Niederschlag"]

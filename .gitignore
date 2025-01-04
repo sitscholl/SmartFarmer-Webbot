@@ -1,7 +1,9 @@
 downloads/*
 SmartFarmer/*
+user_dir*
 user_dir/*
 gcloud_key.json
 credentials.env
 tests/*
 test*
+data/*

@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from io import StringIO
 import datetime
+import re
 
 def get_br_stationdata(driver, jahr, station_id = "103", months = np.arange(4, 9), user = None, pwd = None):
 
@@ -76,7 +77,7 @@ def get_br_stationdata(driver, jahr, station_id = "103", months = np.arange(4, 9
 
     return(data_concat)
 
-def export_sbr(driver, start, end, station_name, user, pwd):
+def export_sbr(driver, start, end, station_name, user = None, pwd = None):
 
     ##Validate input dates
     try:
@@ -90,6 +91,9 @@ def export_sbr(driver, start, end, station_name, user, pwd):
             raise ValueError
     except ValueError:
         raise ValueError(f'End date needs to be in %d.%m.%Y format. Got {end}')
+
+    if isinstance(station_name, str):
+        station_name = [station_name]
 
     ## Open Browser
     driver.get('https://www3.beratungsring.org/')
@@ -124,24 +128,39 @@ def export_sbr(driver, start, end, station_name, user, pwd):
 
     driver.get("https://www.beratungsring.org/beratungsring/export_wetterdaten.php?tyid=207&L=0")
 
-    ##Start date
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_from"))).clear()
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_from"))).send_keys(start)
-
     ##End date
     WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_to"))).clear()
     WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_to"))).send_keys(end)
 
-    ##Select station
-    st_select = Select(driver.find_element(By.NAME, 'st_id'))
-    st_select.select_by_visible_text(station_name)
+    ##Start date
+    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_from"))).clear()
+    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_from"))).send_keys(start)
 
     ##Select Format
     st_select = Select(driver.find_element(By.NAME, 'ExportFormat'))
     st_select.select_by_visible_text('CSV-Datei')
 
-    ##Export
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, "submit"))).click()
+    st_select = Select(driver.find_element(By.NAME, 'st_id'))
 
-    return(f"{station_name.replace(' ', '_')}.csv")
+    for snam in station_name:
+        ##Select station
+        st_select.select_by_visible_text(snam)
 
+        ##Export
+        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, "submit"))).click()
+
+    return([f"{i.replace(' ', '_')}.csv" for i in station_name])
+
+def open_sbr_export(path):
+
+    tbl = pd.read_csv(path, sep = ';', decimal=',').dropna(how = 'all', axis = 1)
+    tbl['datetime'] = pd.to_datetime(tbl["wet_data"] + " " + tbl["wet_ora"], format = '%Y-%m-%d %S:%H:%M')
+
+    tbl.rename(columns = lambda x: re.sub('^wet_', '', x), inplace = True)
+    tbl.drop(['data', 'ora', 'status', 't_2m_min', 't_2m_max', 'luftfeucht_min', 'luftfeucht_max', 'v_wind_max'], axis = 1, inplace = True)
+    tbl = tbl[['datetime', 'wst_codice', *[i for i in np.sort(tbl.columns) if i not in  ['datetime', 'wst_codice']]]]
+
+    scale_cols = ['niederschl', *[col for col in tbl if any([col.startswith(i) for i in ['bt_', 't_', 'tf_', 'tt_']])]]
+    tbl[scale_cols] = tbl[scale_cols] / 10
+
+    return(tbl)
