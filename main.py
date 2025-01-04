@@ -23,36 +23,30 @@ jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
 default_mm = 30
 default_days = 14
 t1_factor = 0.75
-jahreszeit = 'Frühjahr'#['Frühjahr', 'Vorblüte', 'Nachblüte', 'Sommer'] #determine dynamically from current date or from date of spritzung?
 mode = 'full'
-thresholds = {'Tage': {'Apfelmehltau': 14,
-                       'Apfelschorf': 14,
-                       'Bittersalz': 21,
-                       'Ca-Düngung': 21},
-               'Niederschlag': {'Apfelmehltau': 30,
-                       'Apfelschorf': 30,
-                       'Bittersalz': 30,
-                       'Ca-Düngung': 30}}
 
 load_dotenv("credentials.env")
+
 tbl_regenbestaendigkeit = pd.read_csv('data/regenbestaendigkeit.csv', encoding = 'latin-1').rename(columns={'Regenbestaendigkeit': 'Regenbestaendigkeit_max'})
 tbl_regenbestaendigkeit['Regenbestaendigkeit_min'] = tbl_regenbestaendigkeit['Regenbestaendigkeit_max'] * t1_factor
-# tbl_mittel['Behandlungsintervall'] = default_days #replace with actual Behandlungsintervall per sorte that is joined to tbl_mittel
+
 tbl_anfaelligkeit = pd.read_csv("data/sortenanfaelligkeit.csv", encoding="latin-1")
-tbl_behandlungsintervall = (
-    pd.read_csv("data/behandlungsintervall.csv", encoding="latin-1", sep="\t")
+tbl_behandlungsintervall = pd.read_csv("data/behandlungsintervall.csv", encoding="latin-1", sep="\t")
+season_cur = 'Vorblüte' if datetime.datetime.now().month <= 6 else 'Sommer'
+tbl_behandlungsintervall = tbl_behandlungsintervall.loc[(tbl_behandlungsintervall['Mittel'] != 'Nimrod 250 EW') | (tbl_behandlungsintervall['Jahreszeit'] == season_cur)]
+
+tbl_behandlungsintervall_re = (
+    tbl_behandlungsintervall
     .melt(
         id_vars=["Mittel", "Jahreszeit", "Range"],
         var_name="Mehltauanfälligkeit",
         value_name="Behandlungsintervall",
     )
-    .merge(tbl_anfaelligkeit, on="Mehltauanfälligkeit")
-    .query(f"Jahreszeit == '{jahreszeit}'")
+    .merge(tbl_anfaelligkeit, on = "Mehltauanfälligkeit")
     .pivot(columns = 'Range', values = 'Behandlungsintervall', index = ['Mittel', 'Sorte'])
     .reset_index()
     .rename(columns = {'min': 'Behandlungsintervall_min', 'max': 'Behandlungsintervall_max'})
-)
-
+)[['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max']]
 
 # Open webpage and load cookies
 options = Options()
@@ -132,7 +126,7 @@ last_dates['Regenbestaendigkeit_max'] = last_dates['Regenbestaendigkeit_max'].fi
 last_dates['Regenbestaendigkeit_min'] = last_dates['Regenbestaendigkeit_min'].fillna((last_dates['Regenbestaendigkeit_max'] * t1_factor))
 
 ## Add Behandlungsintervall
-last_dates = last_dates.merge(tbl_behandlungsintervall[['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max']], on = ['Mittel', 'Sorte'], how = 'left', validate = 'many_to_one')
+last_dates = last_dates.merge(tbl_behandlungsintervall_re, on = ['Mittel', 'Sorte'], how = 'left', validate = 'many_to_one')
 
 tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall_max'].isna(), 'Mittel'].unique())
 if len(tage_fehlend) > 0:
