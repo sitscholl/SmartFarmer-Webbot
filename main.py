@@ -145,6 +145,11 @@ try:
     sbr_end = datetime.datetime(2024,12,31).strftime('%d.%m.%Y')#datetime.datetime.now().strftime('%d.%m.%Y')
     sbr_files = export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'))
     stationdata = pd.concat([open_sbr_export(Path(download_dir, i)) for i in sbr_files])
+    
+    ## Delete downloaded files
+    for i in sbr_files:
+        Path(download_dir, i).unlink()
+
 except Exception as e:
     stationdata = None
     print('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.')
