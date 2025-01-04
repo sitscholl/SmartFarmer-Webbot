@@ -12,9 +12,8 @@ from pytz import timezone
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-from functions.fetch_smartfarmer import fetch_smartfarmer
+from functions.fetch_smartfarmer import fetch_smartfarmer, reformat_sm_data
 from functions.fetch_sbr import export_sbr, open_sbr_export
-from functions.get_last_dates import get_last_dates
 from functions.google import send_mail, send_sheets
 
 from functions.format_tbl import format_tbl
@@ -118,8 +117,10 @@ filename.unlink()
 Path(csv_name).unlink()
 
 ## Calculate last date of Behandlung
-last_dates = get_last_dates(tbl_sm.copy()) #move calculation of Tage out of function
-last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1)) #transform to unit of days
+tbl_sm_re = reformat_sm_data(tbl_sm.copy())
+last_dates = tbl_sm_re.groupby(['Wiese', 'Sorte', 'Mittel', 'Grund'], as_index = False)['Datum'].max()
+last_dates = last_dates.loc[last_dates['Grund'].isin(["Apfelmehltau", "Apfelschorf", "Ca-Düngung", "Bittersalz"])]
+last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1))
 
 ## Add Regenbeständigkeit
 last_dates = last_dates.merge(tbl_regenbestaendigkeit[['Mittel', 'Regenbestaendigkeit_min', 'Regenbestaendigkeit_max']], on = 'Mittel', how = 'left', validate = 'many_to_one')

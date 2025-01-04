@@ -1,5 +1,7 @@
 import time
 import datetime
+import numpy as np
+import pandas as pd
 from pathlib import Path
 from pytz import timezone
 from selenium.webdriver.common.by import By
@@ -90,3 +92,18 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
     else:
         time.sleep(10)
     print('SmartFarmer Daten heruntergeladen!')
+
+def reformat_sm_data(tbl):
+
+    tbl['Datum'] = pd.to_datetime(tbl['Datum'], format = "%d/%m/%Y")
+    tbl['Grund'] = np.where(tbl['Mittel'].isin(["Yaravita Stopit"]), 'Ca-Düngung', tbl['Grund'])
+    tbl['Grund'] = np.where(tbl['Mittel'].isin(["Epso Combitop", "Epso Top"]), 'Bittersalz', tbl['Grund'])
+
+    tbl['Anlage'] = tbl['Anlage'].str.replace('Neuacker Klein', 'Neuacker')
+    tbl['Wiese'] = tbl['Anlage'].str.split(' ', expand = True).iloc[:,0]
+    tbl['Sorte'] = tbl['Anlage'].str.extract(r"(?<=) (.+) (?=)[0-9]{4}")
+
+    tbl['Grund'] = tbl['Grund'].str.split(', ')
+    tbl = tbl.explode('Grund')
+
+    return(tbl)
