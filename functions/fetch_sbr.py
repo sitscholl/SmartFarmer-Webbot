@@ -9,6 +9,7 @@ import numpy as np
 from io import StringIO
 import datetime
 import re
+from pathlib import Path
 
 def get_br_stationdata(driver, jahr, station_id = "103", months = np.arange(4, 9), user = None, pwd = None):
 
@@ -77,7 +78,7 @@ def get_br_stationdata(driver, jahr, station_id = "103", months = np.arange(4, 9
 
     return(data_concat)
 
-def export_sbr(driver, start, end, station_name, user = None, pwd = None):
+def export_sbr(driver, start, end, station_name, user = None, pwd = None, download_dir = None):
 
     ##Validate input dates
     try:
@@ -149,6 +150,19 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None):
         ##Export
         WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, "submit"))).click()
 
+        #Make sure download finishes
+        if download_dir is not None:
+            seconds = 0
+            dl_wait = True
+            while dl_wait and seconds < 60:
+                time.sleep(1)
+                dfile = Path(download_dir, f"{snam.replace(' ', '_')}.csv")
+                if dfile.is_file():
+                    dl_wait = False
+                seconds += 1
+        else:
+            time.sleep(30)
+            
     return([f"{i.replace(' ', '_')}.csv" for i in station_name])
 
 def open_sbr_export(path):
