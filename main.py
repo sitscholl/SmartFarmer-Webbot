@@ -169,9 +169,10 @@ else:
 driver.quit()
 
 ##Reformat table for output
+val_cols = list( set(['Tage', 'Niederschlag']).intersection(last_dates.dropna(how = 'all', axis = 1).columns) )
 tbl_abs = (
     last_dates.pivot(
-        columns="Grund", index=["Wiese", "Sorte"], values=["Tage", "Niederschlag"]
+        columns="Grund", index=["Wiese", "Sorte"], values=val_cols
     )
     .round(0)
     .astype(int)
@@ -185,7 +186,7 @@ tbl_thresh_max = (
     .rename(columns={"Regenbestaendigkeit_max": "Niederschlag", "Behandlungsintervall_max": "Tage"}, level=0)
     .round(0)
     .astype(int)
-)
+)[val_cols]
 tbl_thresh_min = (
     last_dates.pivot(
         columns="Grund",
@@ -195,7 +196,7 @@ tbl_thresh_min = (
     .rename(columns={"Regenbestaendigkeit_min": "Niederschlag", "Behandlungsintervall_min": "Tage"}, level=0)
     .round(0)
     .astype(int)
-)
+)[val_cols]
 tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(int)
 tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_perc.astype(str) + '%)'
 
