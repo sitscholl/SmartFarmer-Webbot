@@ -128,7 +128,7 @@ last_dates = last_dates.merge(tbl_regenbestaendigkeit[['Mittel', 'Regenbestaendi
 
 mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit_max'].isna(), 'Mittel'].unique())
 if len(mittel_fehlend) > 0:
-    print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{', '.join(mittel_fehlend)}")
+    print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{'\n'.join(mittel_fehlend)}")
 last_dates['Regenbestaendigkeit_max'] = last_dates['Regenbestaendigkeit_max'].fillna(default_mm)
 last_dates['Regenbestaendigkeit_min'] = last_dates['Regenbestaendigkeit_min'].fillna((last_dates['Regenbestaendigkeit_max'] * t1_factor))
 
@@ -137,7 +137,7 @@ last_dates = last_dates.merge(tbl_behandlungsintervall_re, on = ['Mittel', 'Sort
 
 tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall_max'].isna(), 'Mittel'].unique())
 if len(tage_fehlend) > 0:
-    print(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{', '.join(tage_fehlend)}")
+    print(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{'\n'.join(tage_fehlend)}")
 last_dates['Behandlungsintervall_max'] = last_dates['Behandlungsintervall_max'].fillna(default_days)
 last_dates['Behandlungsintervall_min'] = last_dates['Behandlungsintervall_min'].fillna((last_dates['Behandlungsintervall_max'] * t1_factor).round(0))
 
@@ -207,8 +207,13 @@ tbl_thresh_min = (
     .round(0)
     .astype(int)
 )[val_cols]
+tbl_mittel = (
+    last_dates.pivot(
+        columns="Grund", index=["Wiese", "Sorte"], values="Mittel"
+    )
+)
 tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(int)
-tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_perc.astype(str) + '%)'
+tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_mittel + ')'
 
 # tbl_formatted = format_tbl(tbl_string, tbl_abs, t1 = tbl_thresh_min, t2 = tbl_thresh_max, caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}")
 
