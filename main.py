@@ -84,6 +84,13 @@ if platform.uname().system != 'Windows':
     tz_params = {'timezoneId': 'Europe/Rome'}
     driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
 
+## Simulate slow internet connection (for debugging)
+# driver.set_network_conditions(
+#     offline=False,
+#     latency=5,  # additional latency (ms)
+#     download_throughput=500 * 1024,  # maximal throughput
+#     upload_throughput=500 * 1024)  # maximal throughput
+
 ## Download table from smartfarmer
 try:
     fetch_smartfarmer(
@@ -134,15 +141,18 @@ if len(tage_fehlend) > 0:
 last_dates['Behandlungsintervall_max'] = last_dates['Behandlungsintervall_max'].fillna(default_days)
 last_dates['Behandlungsintervall_min'] = last_dates['Behandlungsintervall_min'].fillna((last_dates['Behandlungsintervall_max'] * t1_factor).round(0))
 
-##Drop entries with multiple Mittel and keep only one with longest?? Regenbestaendigkeit
-last_dates = last_dates.sort_values('Regenbestaendigkeit_max', ascending = False).drop_duplicates(subset = ['Wiese', 'Sorte', 'Grund'])
+##Get last Spritzung for each field and reason. 
+##If multiple mittel with same reason on same day, keep one with longest regenbestaendigkeit and behandlungsintervall
+last_dates = last_dates.sort_values(
+    ["Datum", "Regenbestaendigkeit_max", "Behandlungsintervall_max"], ascending=False
+).drop_duplicates(subset=["Wiese", "Sorte", "Grund"], keep="first")
 
 # Get stationdata from SBR
 start_dates = last_dates['Datum'].unique()
 
 try:
     sbr_start = last_dates['Datum'].min().strftime('%d.%m.%Y')
-    sbr_end = datetime.datetime(2024,12,31).strftime('%d.%m.%Y')#datetime.datetime.now().strftime('%d.%m.%Y')
+    sbr_end = min([datetime.datetime(jahr,12,31), datetime.datetime.now()]).strftime('%d.%m.%Y')
     sbr_files = export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'), download_dir = download_dir)
     stationdata = pd.concat([open_sbr_export(Path(download_dir, i)) for i in sbr_files])
     
