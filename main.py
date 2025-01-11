@@ -59,6 +59,7 @@ options.add_argument('--no-gpu')
 options.add_argument('--disable-extensions')
 options.add_argument('--dns-prefetch-disable')
 
+
 if platform.uname().system == 'Windows':
     download_dir = f"{Path.cwd()}\\downloads"
     user_dir = f"{Path.cwd()}\\user_dir"
