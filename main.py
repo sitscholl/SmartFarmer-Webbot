@@ -46,13 +46,18 @@ tbl_behandlungsintervall_re = (
     .rename(columns = {'min': 'Behandlungsintervall_min', 'max': 'Behandlungsintervall_max'})
 )[['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max']]
 
-## Start browser
+## Specify download and user-data directories
 if platform.uname().system == 'Windows':
     download_dir = f"{Path.cwd()}\\downloads"
     user_dir = f"{Path.cwd()}\\user_dir"
 else:
     download_dir = f'{Path.cwd()}\\downloads'
     user_dir = f'user_dir'
+Path(download_dir).mkdir(parents=True, exist_ok=True)
+for f in Path(download_dir).glob("*"):
+    f.unlink()
+
+##Start drivers
 driver = init_driver(download_dir=download_dir, user_dir=user_dir)
 
 ## Download table from smartfarmer

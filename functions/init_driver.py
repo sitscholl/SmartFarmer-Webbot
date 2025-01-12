@@ -19,7 +19,6 @@ def init_driver(user_dir, download_dir, headless = True, simulate_slow_conn = Fa
     options.add_argument('--dns-prefetch-disable')
 
     ## Set the download directory and user_data_dir
-    Path(download_dir).mkdir(parents=True, exist_ok=True)
     options.add_argument(f"user-data-dir={user_dir}")
     prefs = {
         "download.default_directory": download_dir,
