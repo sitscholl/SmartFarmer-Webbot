@@ -9,13 +9,10 @@ from dotenv import load_dotenv
 from xlsx2csv import Xlsx2csv
 from pytz import timezone
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-
+from functions.init_driver import init_driver
 from functions.fetch_smartfarmer import fetch_smartfarmer, reformat_sm_data
 from functions.fetch_sbr import export_sbr, open_sbr_export
 from functions.google import send_mail, send_sheets
-
 from functions.format_tbl import format_tbl
 
 ##Parameters
@@ -27,6 +24,7 @@ mode = 'full'
 
 load_dotenv("credentials.env")
 
+## Load input data tables
 tbl_regenbestaendigkeit = pd.read_csv('data/regenbestaendigkeit.csv', encoding = 'latin-1').rename(columns={'Regenbestaendigkeit': 'Regenbestaendigkeit_max'})
 tbl_regenbestaendigkeit['Regenbestaendigkeit_min'] = tbl_regenbestaendigkeit['Regenbestaendigkeit_max'] * t1_factor
 
@@ -48,47 +46,14 @@ tbl_behandlungsintervall_re = (
     .rename(columns = {'min': 'Behandlungsintervall_min', 'max': 'Behandlungsintervall_max'})
 )[['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max']]
 
-# Open webpage and load cookies
-options = Options()
-options.add_argument("--disable-search-engine-choice-screen")
-options.add_argument("--start-maximized")
-options.add_argument("--window-size=1920,1080")
-options.add_argument('--headless')
-options.add_argument('--no-sandbox')
-options.add_argument('--no-gpu')
-options.add_argument('--disable-extensions')
-options.add_argument('--dns-prefetch-disable')
-
-
+## Start browser
 if platform.uname().system == 'Windows':
     download_dir = f"{Path.cwd()}\\downloads"
     user_dir = f"{Path.cwd()}\\user_dir"
 else:
-    download_dir = 'downloads'
-    user_dir = 'user_dir'
-
-options.add_argument(f"user-data-dir={user_dir}")
-prefs = {
-    "download.default_directory": download_dir,
-    "download.directory_upgrade": True,
-    "download.prompt_for_download": False,
-}
-options.add_experimental_option("prefs", prefs)
-
-## Open Browser
-driver = webdriver.Chrome(options=options)
-
-# Set timezone
-if platform.uname().system != 'Windows':
-    tz_params = {'timezoneId': 'Europe/Rome'}
-    driver.execute_cdp_cmd('Emulation.setTimezoneOverride', tz_params)
-
-## Simulate slow internet connection (for debugging)
-# driver.set_network_conditions(
-#     offline=False,
-#     latency=5,  # additional latency (ms)
-#     download_throughput=500 * 1024,  # maximal throughput
-#     upload_throughput=500 * 1024)  # maximal throughput
+    download_dir = f'{Path.cwd()}\\downloads'
+    user_dir = f'user_dir'
+driver = init_driver(download_dir=download_dir, user_dir=user_dir)
 
 ## Download table from smartfarmer
 try:
@@ -102,7 +67,7 @@ try:
 except Exception as e:
     print('Smartfarmer Download Fehlgeschlagen.')
     print(e)
-    driver.save_screenshot(f'SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
+    driver.save_screenshot(f'screenshots/SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
     
     sys.exit()
 
@@ -163,6 +128,7 @@ except Exception as e:
     stationdata = None
     print('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.')
     print(e)
+    driver.save_screenshot(f'screenshots/SBR_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
 
 if stationdata is not None:
     sums = []
@@ -217,7 +183,7 @@ tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl
 # tbl_formatted = format_tbl(tbl_string, tbl_abs, t1 = tbl_thresh_min, t2 = tbl_thresh_max, caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}")
 
 ##Send to gsheets
-send_sheets(tbl_string)
+# send_sheets(tbl_string)
 
 ##Send email
 params = np.unique(tbl_string.columns.get_level_values(0))
