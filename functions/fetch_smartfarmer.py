@@ -25,6 +25,12 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
 
     ## Log into SmartFarmer (if needed)
     if "Bitte geben Sie Ihre E-Mail Adresse ein" in driver.page_source:
+
+        if user is None:
+            raise ValueError(f"SmartFarmer login required but user variable is None!")
+        if pwd is None:
+            raise ValueError("SmartFarmer login required but pwd variable is None!")
+
         wait = WebDriverWait(driver, 10)
 
         ##Insert Email
