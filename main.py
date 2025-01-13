@@ -54,6 +54,7 @@ else:
     download_dir = f'{Path.cwd()}\\downloads'
     user_dir = f'user_dir'
 Path(download_dir).mkdir(parents=True, exist_ok=True)
+#Empty download directory
 for f in Path(download_dir).glob("*"):
     f.unlink()
 
@@ -81,10 +82,6 @@ filename = sorted(list(Path(download_dir).glob('*.xlsx')), key = lambda x: x.sta
 csv_name = str(filename).replace('.xlsx', '.csv')
 Xlsx2csv(filename, outputencoding="latin-1").convert(csv_name)
 tbl_sm = pd.read_csv(csv_name, encoding = 'latin-1')
-
-## Delete downloaded files
-filename.unlink()
-Path(csv_name).unlink()
 
 ## Calculate last date of Behandlung
 tbl_sm_re = reformat_sm_data(tbl_sm.copy())
@@ -125,10 +122,6 @@ try:
     sbr_files = export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'), download_dir = download_dir)
     stationdata = pd.concat([open_sbr_export(Path(download_dir, i)) for i in sbr_files])
     
-    ## Delete downloaded files
-    for i in sbr_files:
-        Path(download_dir, i).unlink()
-
 except Exception as e:
     stationdata = None
     print('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.')
@@ -184,6 +177,9 @@ tbl_mittel = (
 )
 tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(int)
 tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_mittel + ')'
+
+Path("results/tbl_string.csv").mkdir(parents=True, exist_ok=True)
+tbl_string.to_csv('results/tbl_string.csv')
 
 # tbl_formatted = format_tbl(tbl_string, tbl_abs, t1 = tbl_thresh_min, t2 = tbl_thresh_max, caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}")
 
