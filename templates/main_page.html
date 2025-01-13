@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script type=text/javascript>
+          $(function() {
+            $('a#update').on('click', function(e) {
+              e.preventDefault()
+              $.getJSON('/update_data',
+                  function(data) {
+                //do nothing
+              });
+              return false;
+            });
+          });
+  </script>
+  <meta charset="utf-8">
+  <title>Behandlungsübersicht</title>
+</head>
+
+<body>
+  <h1>Behandlungsübersicht</h1>
+  <p><span style="color:#9e9e9e;font-size:14px;">Letzte aktualisierung: {{ date }}</span></p>
+
+  <div class='container'>
+    <form>
+        <a href=# id=update><button class='btn btn-default'>Daten Aktualisieren</button></a>
+    </form>
+  </div>
+
+  {% if data %}
+    {% for nam in data %}
+      <h2>{{ nam }}</h2>
+      <div>
+        {{ data[nam] | safe }}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p><span>Keine Daten verfügbar.</span></p>
+  {% endif %}
+</body>
+
+<br>
+<br>
+
+</html>
+
