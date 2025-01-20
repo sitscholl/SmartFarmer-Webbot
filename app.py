@@ -14,7 +14,7 @@ def hello_geek():
     if Path('results/tbl_string.csv').is_file():
         tbl = pd.read_csv('results/tbl_string.csv', header=[0,1,2])
         tbl.rename(columns = lambda x: '' if 'Unnamed' in x else x, inplace = True)
-        data = {i: tbl[i].to_html() for i in np.unique(tbl.columns.get_level_values(0)) if i != ''}
+        data = {i: tbl[i] for i in np.unique(tbl.columns.get_level_values(0)) if i != ''}
     else:
         data = None
     print(data)
