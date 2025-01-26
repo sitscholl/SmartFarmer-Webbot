@@ -2,6 +2,9 @@ from email.message import EmailMessage
 import smtplib
 import gspread
 from gspread_dataframe import set_with_dataframe
+import logging
+
+logger = logging.getLogger(__name__)
 
 def send_mail(msg_html, user, pwd, recipients = 'tscholl.simon@gmail.com'):
 
@@ -16,7 +19,7 @@ def send_mail(msg_html, user, pwd, recipients = 'tscholl.simon@gmail.com'):
         smtp_server.login(user, pwd)
         smtp_server.send_message(msg)
 
-    print('Email versendet!')
+    logger.info('Email versendet!')
 
 def send_sheets(tbl_string, creds = 'gcloud_key.json', spreadsheet = 'Behandlungsübersicht', worksheet = 'Behandlungsübersicht'):
 

@@ -1,9 +1,13 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 def init_driver(user_dir, download_dir, headless = True, simulate_slow_conn = False):
     
+    logger.info('Starte browser...')
     # Specify driver options
     options = Options()
     options.add_argument("--disable-search-engine-choice-screen")
@@ -42,4 +46,5 @@ def init_driver(user_dir, download_dir, headless = True, simulate_slow_conn = Fa
             download_throughput=500 * 1024,  # maximal throughput
             upload_throughput=500 * 1024)  # maximal throughput
 
+    logger.info('Browser gestartet.')
     return(driver)

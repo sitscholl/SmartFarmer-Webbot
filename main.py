@@ -16,12 +16,19 @@ from functions.fetch_sbr import export_sbr, open_sbr_export
 from functions.google import send_mail, send_sheets
 from functions.format_tbl import format_tbl
 
+import logging
+import logging.config
+
+logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
+logger = logging.getLogger(__name__)
+
 ##Parameters
 jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
 default_mm = 30
 default_days = 14
 t1_factor = 0.75
-mode = 'full'
+
+logger.info(f"Programm gestartet: Jahr = {jahr}, default_mm = {default_mm}, default_tage = {default_days}, t1_factor = {t1_factor}")
 
 load_dotenv("credentials.env")
 
@@ -56,6 +63,7 @@ else:
     user_dir = f'user_dir'
 Path(download_dir).mkdir(parents=True, exist_ok=True)
 Path("screenshots").mkdir(parents=True, exist_ok=True)
+
 #Empty download directory
 for f in Path(download_dir).glob("*"):
     f.unlink()
@@ -73,12 +81,11 @@ try:
         download_dir=download_dir,
     )
 except Exception as e:
-    print('Smartfarmer Download Fehlgeschlagen.')
-    print(e)
-    driver.save_screenshot(f'screenshots/SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
-    
+    logger.error('SmartFarmer download fehlgeschlagen.', exc_info=True)
+    # driver.save_screenshot(f'screenshots/SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
     sys.exit()
 
+logger.info('Formatiere SmartFarmer Tabelle')
 ## Open in pandas
 filename = sorted(list(Path(download_dir).glob('*.xlsx')), key = lambda x: x.stat().st_ctime)[-1]
 csv_name = str(filename).replace('.xlsx', '.csv')
@@ -96,7 +103,8 @@ last_dates = last_dates.merge(tbl_regenbestaendigkeit[['Mittel', 'Regenbestaendi
 
 mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit_max'].isna(), 'Mittel'].unique())
 if len(mittel_fehlend) > 0:
-    print(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{', '.join(mittel_fehlend)}")
+    mittel_join = "\t" + '\n\t'.join(mittel_fehlend)
+    logger.warning(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{mittel_join}")
 last_dates['Regenbestaendigkeit_max'] = last_dates['Regenbestaendigkeit_max'].fillna(default_mm)
 last_dates['Regenbestaendigkeit_min'] = last_dates['Regenbestaendigkeit_min'].fillna((last_dates['Regenbestaendigkeit_max'] * t1_factor))
 
@@ -105,7 +113,8 @@ last_dates = last_dates.merge(tbl_behandlungsintervall_re, on = ['Mittel', 'Sort
 
 tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall_max'].isna(), 'Mittel'].unique())
 if len(tage_fehlend) > 0:
-    print(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{', '.join(tage_fehlend)}")
+    tage_join = "\t" + '\n\t'.join(mittel_fehlend)
+    logger.warning(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{tage_join}")
 last_dates['Behandlungsintervall_max'] = last_dates['Behandlungsintervall_max'].fillna(default_days)
 last_dates['Behandlungsintervall_min'] = last_dates['Behandlungsintervall_min'].fillna((last_dates['Behandlungsintervall_max'] * t1_factor).round(0))
 
@@ -126,11 +135,11 @@ try:
     
 except Exception as e:
     stationdata = None
-    print('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.')
-    print(e)
-    driver.save_screenshot(f'screenshots/SBR_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
+    logger.error('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.', exc_info = True)
+    # driver.save_screenshot(f'screenshots/SBR_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
 
 if stationdata is not None:
+    logger.info('Berechne Niederschlagssummen')
     sums = []
     for start in start_dates:
         sums.append(stationdata.loc[(stationdata['datetime'] >= start) & (stationdata['datetime'] < datetime.datetime.now()), 'niederschl'].sum())
@@ -144,6 +153,7 @@ else:
 driver.quit()
 
 ##Reformat table for output
+logger.info('Formatiere output Tabelle')
 val_cols = list( set(['Tage', 'Niederschlag']).intersection(last_dates.dropna(how = 'all', axis = 1).columns) )
 tbl_abs = (
     last_dates.pivot(
@@ -189,6 +199,7 @@ tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl
 # send_sheets(tbl_string)
 
 ##Send email
+logger.info('Sende email')
 params = np.unique(tbl_string.columns.get_level_values(0))
 environment = Environment(loader=FileSystemLoader("templates/"))
 template = environment.get_template("mail_body.html")
@@ -199,3 +210,5 @@ mail_body = template.render(
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
 send_mail(mail_body, user, pwd)
+
+logger.info('Aktualisierung Behandlungsübersicht abgeschlossen.')

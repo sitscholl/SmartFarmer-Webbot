@@ -38,6 +38,7 @@ COPY functions/ ./functions/
 COPY user_dir/ ./user_dir/
 COPY templates/ ./templates/
 COPY main.py ./main.py
+COPY .config ./.config/
 
 # Default command to run the Python script
 CMD ["python", "main.py"]

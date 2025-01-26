@@ -7,9 +7,13 @@ from pytz import timezone
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import logging
+
+logger = logging.getLogger(__name__)
 
 def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None):
 
+    logger.info('Lade SmartFarmer webseite')
     driver.get('https://app.smartfarmer.it/#/auth/welcome/')
 
     ##Wait for page to be loaded
@@ -43,7 +47,9 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
         driver.find_element(By.XPATH, '//input[@type="password"]').send_keys(pwd)
         login_element.click()
 
-        print('SmartFarmer Anmeldung erfolgreich')
+        logger.info('SmartFarmer Anmeldung erfolgreich')
+    else:
+        logger.info('SmartFarmer bereits angemeldet.')
 
     WebDriverWait(driver, 30).until(
         EC.any_of(
@@ -97,7 +103,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
                     break
     else:
         time.sleep(10)
-    print('SmartFarmer Daten heruntergeladen!')
+    logger.info('SmartFarmer Daten heruntergeladen!')
 
 def reformat_sm_data(tbl):
 

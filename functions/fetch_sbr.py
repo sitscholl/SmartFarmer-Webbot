@@ -10,6 +10,9 @@ from io import StringIO
 import datetime
 import re
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 def export_sbr(driver, start, end, station_name, user = None, pwd = None, download_dir = None):
 
@@ -29,6 +32,7 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
     if isinstance(station_name, str):
         station_name = [station_name]
 
+    logger.info('Lade Beratungsring Webseite')
     ## Open Browser
     driver.get('https://www3.beratungsring.org/')
 
@@ -59,12 +63,15 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
         ##Press Anmelden
         driver.find_element(By.XPATH, '//button[@type="submit"]').click()
 
-        print('SBR Anmeldung erfolgreich.')
+        logger.info('SBR Anmeldung erfolgreich.')
+    else:
+        logger.info('Bereits bei SBR angemeldet.')
 
     WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '//span[normalize-space()="Mein SBR"]'))).click()
     WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[6]/ul/li[5]/a'))).click()
     driver.switch_to.window(driver.window_handles[-1])
 
+    logger.info('Lade SBR Stationsdaten.')
     driver.get("https://www.beratungsring.org/beratungsring/export_wetterdaten.php?tyid=207&L=0")
 
     ##End date
@@ -100,6 +107,8 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
                 seconds += 1
         else:
             time.sleep(30)
+
+        logger.info(f'Wetterdaten für station {snam} heruntergeladen.')
             
     return([f"{i.replace(' ', '_')}.csv" for i in station_name])
 
