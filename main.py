@@ -8,6 +8,7 @@ import sys
 from dotenv import load_dotenv
 from xlsx2csv import Xlsx2csv
 from pytz import timezone
+from jinja2 import Environment, FileSystemLoader
 
 from functions.init_driver import init_driver
 from functions.fetch_smartfarmer import fetch_smartfarmer, reformat_sm_data
@@ -189,16 +190,12 @@ tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl
 
 ##Send email
 params = np.unique(tbl_string.columns.get_level_values(0))
-caption = f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}"
-msg_html = "".join(
-    [
-    f"""\
-    <h2>{param}</h2>
-    {format_tbl(tbl_string[param], tbl_abs[param], tbl_thresh_min[param], tbl_thresh_max[param]).to_html()}
-    """
-    for param in params
-    ]
+environment = Environment(loader=FileSystemLoader("templates/"))
+template = environment.get_template("mail_body.html")
+mail_body = template.render(
+    date=datetime.datetime.now(tz = timezone('Europe/Berlin')).strftime("%Y-%m-%d %H:%M"),
+    tables_dict = {i: format_tbl(tbl_string[i], tbl_abs[i], tbl_thresh_min[i], tbl_thresh_max[i]).to_html(classes = "tb") for i in params},
 )
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
-send_mail(msg_html, user, pwd)
+send_mail(mail_body, user, pwd)

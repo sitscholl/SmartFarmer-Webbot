@@ -10,15 +10,16 @@ def format_tbl(tbl_string, vals, t1, t2, caption = None):
 
     styler = tbl_string.style.apply(lambda _: colormat, axis=None)
 
-    styler.set_table_styles([{'selector': 'th,td', 'props': [('border','1px solid')]}])
-    if caption is not None:
-        styler.set_caption(caption).set_table_styles(
-            [
-                {
-                    "selector": "caption",
-                    "props": "caption-side: bottom;",
-                }
-            ],
-            overwrite=False,
-        )
+    headers = {
+    "selector": "th",
+    "props": "border:1px solid #707B7C;border-collapse:collapse;padding:5px"
+    }
+    cells = {
+    "selector": "td",
+    "props": "border:1px solid #707B7C;border-collapse:collapse;padding:5px"
+    }  
+    full = {"selector": "", "props": [("border-collapse", "collapse"), ("border", "1px solid #707B7C")]}
+
+    styler.set_table_styles([headers,cells,full])
+
     return styler
