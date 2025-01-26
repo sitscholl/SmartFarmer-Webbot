@@ -36,6 +36,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY data/ ./data/
 COPY functions/ ./functions/
 COPY user_dir/ ./user_dir/
+COPY templates/ ./templates/
+COPY main.py ./main.py
 
 # Default command to run the Python script
 CMD ["python", "main.py"]
