@@ -54,6 +54,7 @@ else:
     download_dir = f'{Path.cwd()}\\downloads'
     user_dir = f'user_dir'
 Path(download_dir).mkdir(parents=True, exist_ok=True)
+Path("screenshots").mkdir(parents=True, exist_ok=True)
 #Empty download directory
 for f in Path(download_dir).glob("*"):
     f.unlink()
@@ -178,8 +179,8 @@ tbl_mittel = (
 tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(int)
 tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_mittel + ')'
 
-Path("results").mkdir(parents=True, exist_ok=True)
-tbl_string.to_csv('results/tbl_string.csv')
+# Path("results").mkdir(parents=True, exist_ok=True)
+# tbl_string.to_csv('results/tbl_string.csv')
 
 # tbl_formatted = format_tbl(tbl_string, tbl_abs, t1 = tbl_thresh_min, t2 = tbl_thresh_max, caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}")
 
