@@ -33,12 +33,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code & files
-COPY data/ ./data/
-COPY functions/ ./functions/
-COPY user_dir/ ./user_dir/
-COPY templates/ ./templates/
-COPY main.py ./main.py
-COPY .config ./.config/
+COPY . .
 
 # Default command to run the Python script
 CMD ["python", "main.py"]
