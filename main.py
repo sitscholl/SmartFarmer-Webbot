@@ -11,6 +11,7 @@ from pytz import timezone
 from jinja2 import Environment, FileSystemLoader
 import spINT
 import argparse
+from tempfile import TemporaryDirectory
 import logging
 import logging.config
 
@@ -31,13 +32,21 @@ parser.add_argument('--default_days', type=int, default=14,
                     help='default value for days')
 parser.add_argument('--t1_factor', type=float, default=0.75,
                     help='factor for t1')
+parser.add_argument('-d', '--download_dir', default = TemporaryDirectory().name, help = 'Download directory')
+parser.add_argument('-u', '--user_dir', default = "user_dir", help = 'Directory with user data from chrome.')
 
+# Parse the arguments
 args = parser.parse_args()
 
 jahr = args.jahr
 default_mm = args.default_mm
 default_days = args.default_days
 t1_factor = args.t1_factor
+download_dir = args.download_dir
+user_dir = args.user_dir
+
+# Create download directory
+Path(download_dir).mkdir(exist_ok = True, parents = True)
 
 logger.info(f"Programm gestartet: Jahr = {jahr}, default_mm = {default_mm}, default_tage = {default_days}, t1_factor = {t1_factor}")
 
@@ -47,19 +56,9 @@ tbl_regenbestaendigkeit = spINT.load_regenbestaendigkeit("data/regenbestaendigke
 tbl_sortenanfaelligkeit = spINT.load_sortenanfaelligkeit("data/sortenanfaelligkeit.csv")
 tbl_behandlungsintervall = spINT.load_behandlungsintervall("data/behandlungsintervall.csv", tbl_sortenanfaelligkeit)
 
-## Specify download and user-data directories
+## On windows, full path to user_dir needed
 if platform.uname().system == 'Windows':
-    download_dir = f"{Path.cwd()}\\downloads"
     user_dir = f"{Path.cwd()}\\user_dir"
-else:
-    download_dir = f'{Path.cwd()}\\downloads'
-    user_dir = f'user_dir'
-Path(download_dir).mkdir(parents=True, exist_ok=True)
-Path("screenshots").mkdir(parents=True, exist_ok=True)
-
-#Empty download directory
-for f in Path(download_dir).glob("*"):
-    f.unlink()
 
 ##Start drivers
 driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, timeout = 30)
@@ -75,7 +74,6 @@ try:
     )
 except Exception as e:
     logger.error('SmartFarmer download fehlgeschlagen.', exc_info=True)
-    # driver.save_screenshot(f'screenshots/SmartFarmer_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
     sys.exit()
 
 logger.info('Formatiere SmartFarmer Tabelle')
