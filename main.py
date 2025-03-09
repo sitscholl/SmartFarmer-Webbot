@@ -10,17 +10,32 @@ from xlsx2csv import Xlsx2csv
 from pytz import timezone
 from jinja2 import Environment, FileSystemLoader
 import spINT
+import argparse
 import logging
 import logging.config
 
 logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
 
-##Parameters
-jahr = datetime.datetime.now().year - (datetime.datetime.now().month < 3)
-default_mm = 30
-default_days = 14
-t1_factor = 0.75
+# Create the parser
+parser = argparse.ArgumentParser(description='Berechne den Zeitraum pro Wiese seit der letzten Behandlung.')
+
+# Add the arguments
+parser.add_argument('-j', '--jahr', type=int, default=2024,
+                    help='the year to process')
+parser.add_argument('--default_mm', type=int, default=30,
+                    help='default value for mm')
+parser.add_argument('--default_days', type=int, default=14,
+                    help='default value for days')
+parser.add_argument('--t1_factor', type=float, default=0.75,
+                    help='factor for t1')
+
+args = parser.parse_args()
+
+jahr = args.jahr
+default_mm = args.default_mm
+default_days = args.default_days
+t1_factor = args.t1_factor
 
 logger.info(f"Programm gestartet: Jahr = {jahr}, default_mm = {default_mm}, default_tage = {default_days}, t1_factor = {t1_factor}")
 
@@ -45,7 +60,7 @@ for f in Path(download_dir).glob("*"):
     f.unlink()
 
 ##Start drivers
-driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, headless=False)
+driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir)
 
 ## Download table from smartfarmer
 try:
