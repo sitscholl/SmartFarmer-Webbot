@@ -31,3 +31,78 @@ The application code also needs some secrets to be able to log into the required
 ```
 docker run --rm -it --entrypoint=/bin/bash --shm-size=500m --env-file=credentials.env --mount type=bind,src="$(pwd)"/screenshots,dst=/app/screenshots behandlungsuebersicht  
 ```
+
+## Hosting on Google Cloud Run
+
+### Set up project
+
+The first step is to create a google cloud project at the (google cloud console)[https://console.cloud.google.com/). Ensure that billing is enabled for the project, as this is required to use google cloud run (can be activated by going to the google cloud run page).
+
+Also enable the Artifact Registry for the project at (this link)[https://console.cloud.google.com/flows/enableapi?apiid=artifactregistry.googleapis.com&redirect=https://cloud.google.com/artifact-registry/docs/docker/quickstart]
+
+### Push local docker container to artifact registry
+
+The next steps can either be followed by downloading the gcloud sdk or by using the terminal within the google cloud console. The second approach will be described here. First, create a new repository within the artifact registriy, where the docker image will be stored:
+
+```
+gcloud artifacts repositories create spritzintervall \
+  --repository-format=docker \
+  --location=europe \
+  --description="Spritzintervall Docker App"
+```
+
+Next, configure docker to use the glcoud credentials. This command updates your Docker configuration to use Google Cloud’s credential helper for Artifact Registry. If the docker image is developed locally, the following command has to be run in the local shell and required a working installation of the google cloud sdk (see below):
+
+```
+gcloud auth configure-docker europe-docker.pkg.dev
+```
+
+The local Docker image must be tagged to match the Artifact Registry repository naming convention:
+
+```
+LOCATION-docker.pkg.dev/PROJECT_ID/REPOSITORY_NAME/IMAGE:TAG
+```
+
+To do this, run:
+
+```
+docker tag spritzintervall:latest europe-docker.pkg.dev/oberlenghof/spritzintervall/spritzintervall:latest
+```
+
+Now push the tagged image to the artifact registry:
+
+```
+docker push europe-docker.pkg.dev/oberlenghof/spritzintervall/spritzintervall:latest
+```
+
+You can verify the upload in the Google Cloud Console under Artifact Registry or by listing images using:
+
+```
+gcloud artifacts docker images list europe-docker.pkg.dev/oberlenghof/spritzintervall
+```
+
+### Deploy to google cloud run
+
+Enable the necessary services in the google cloud console for the project:
+
+```
+gcloud services enable artifactregistry.googleapis.com \
+                      run.googleapis.com \
+                      cloudbuild.googleapis.com \
+                      logging.googleapis.com
+```
+
+The container can then be deployed to google cloud run using the web interface: Go to google cloud run in the project and select add service and fill out the requested fields.
+
+## Installing gcloud sdk
+
+To download and install the gcloud sdk, the following steps must be followed. 
+
+Insert the following command in Powershell (administrator mode): 
+
+```
+(New-Object Net.WebClient).DownloadFile("https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe", "$env:Temp\GoogleCloudSDKInstaller.exe")
+& $env:Temp\GoogleCloudSDKInstaller.exe
+```
+
+After the installation has been finished, a window appears where gcloud sdk can be configured and the project to be used can be set. Otherwise, this can also be done manually via the command `gcloud init`. 

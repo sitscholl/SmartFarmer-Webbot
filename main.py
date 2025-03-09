@@ -192,7 +192,7 @@ tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl
 ##Send email
 logger.info('Sende email')
 params = np.unique(tbl_string.columns.get_level_values(0))
-environment = Environment(loader=FileSystemLoader("templates/"))
+environment = Environment(loader=FileSystemLoader("template/"))
 template = environment.get_template("mail.html")
 mail_body = template.render(
     date=datetime.datetime.now(tz = timezone('Europe/Berlin')).strftime("%Y-%m-%d %H:%M"),
