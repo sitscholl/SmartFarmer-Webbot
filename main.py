@@ -9,13 +9,7 @@ from dotenv import load_dotenv
 from xlsx2csv import Xlsx2csv
 from pytz import timezone
 from jinja2 import Environment, FileSystemLoader
-
-from functions.init_driver import init_driver
-from functions.fetch_smartfarmer import fetch_smartfarmer, reformat_sm_data
-from functions.fetch_sbr import export_sbr, open_sbr_export
-from functions.google import send_mail, send_sheets
-from functions.format_tbl import format_tbl
-
+import spINT
 import logging
 import logging.config
 
@@ -32,27 +26,9 @@ logger.info(f"Programm gestartet: Jahr = {jahr}, default_mm = {default_mm}, defa
 
 load_dotenv("credentials.env")
 
-## Load input data tables
-tbl_regenbestaendigkeit = pd.read_csv('data/regenbestaendigkeit.csv', encoding = 'latin-1').rename(columns={'Regenbestaendigkeit': 'Regenbestaendigkeit_max'})
-tbl_regenbestaendigkeit['Regenbestaendigkeit_min'] = tbl_regenbestaendigkeit['Regenbestaendigkeit_max'] * t1_factor
-
-tbl_anfaelligkeit = pd.read_csv("data/sortenanfaelligkeit.csv", encoding="latin-1")
-tbl_behandlungsintervall = pd.read_csv("data/behandlungsintervall.csv", encoding="latin-1", sep="\t")
-season_cur = 'Vorblüte' if datetime.datetime.now().month <= 6 else 'Sommer'
-tbl_behandlungsintervall = tbl_behandlungsintervall.loc[(tbl_behandlungsintervall['Mittel'] != 'Nimrod 250 EW') | (tbl_behandlungsintervall['Jahreszeit'] == season_cur)]
-
-tbl_behandlungsintervall_re = (
-    tbl_behandlungsintervall
-    .melt(
-        id_vars=["Mittel", "Jahreszeit", "Range"],
-        var_name="Mehltauanfälligkeit",
-        value_name="Behandlungsintervall",
-    )
-    .merge(tbl_anfaelligkeit, on = "Mehltauanfälligkeit")
-    .pivot(columns = 'Range', values = 'Behandlungsintervall', index = ['Mittel', 'Sorte'])
-    .reset_index()
-    .rename(columns = {'min': 'Behandlungsintervall_min', 'max': 'Behandlungsintervall_max'})
-)[['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max']]
+tbl_regenbestaendigkeit = spINT.load_regenbestaendigkeit("data/regenbestaendigkeit.csv", t1_factor = t1_factor)
+tbl_sortenanfaelligkeit = spINT.load_sortenanfaelligkeit("data/sortenanfaelligkeit.csv")
+tbl_behandlungsintervall = spINT.load_behandlungsintervall("data/behandlungsintervall.csv", tbl_sortenanfaelligkeit)
 
 ## Specify download and user-data directories
 if platform.uname().system == 'Windows':
@@ -69,11 +45,11 @@ for f in Path(download_dir).glob("*"):
     f.unlink()
 
 ##Start drivers
-driver = init_driver(download_dir=download_dir, user_dir=user_dir)
+driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, headless=False)
 
 ## Download table from smartfarmer
 try:
-    fetch_smartfarmer(
+    spINT.fetch_smartfarmer(
         driver,
         jahr,
         user=os.environ.get("SM_USERNAME"),
@@ -93,7 +69,7 @@ Xlsx2csv(filename, outputencoding="latin-1").convert(csv_name)
 tbl_sm = pd.read_csv(csv_name, encoding = 'latin-1')
 
 ## Calculate last date of Behandlung
-tbl_sm_re = reformat_sm_data(tbl_sm.copy())
+tbl_sm_re = spINT.reformat_sm_data(tbl_sm.copy())
 last_dates = tbl_sm_re.groupby(['Wiese', 'Sorte', 'Mittel', 'Grund'], as_index = False)['Datum'].max()
 last_dates = last_dates.loc[last_dates['Grund'].isin(["Apfelmehltau", "Apfelschorf", "Ca-Düngung", "Bittersalz"])]
 last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1))
@@ -109,7 +85,7 @@ last_dates['Regenbestaendigkeit_max'] = last_dates['Regenbestaendigkeit_max'].fi
 last_dates['Regenbestaendigkeit_min'] = last_dates['Regenbestaendigkeit_min'].fillna((last_dates['Regenbestaendigkeit_max'] * t1_factor))
 
 ## Add Behandlungsintervall
-last_dates = last_dates.merge(tbl_behandlungsintervall_re, on = ['Mittel', 'Sorte'], how = 'left', validate = 'many_to_one')
+last_dates = last_dates.merge(tbl_behandlungsintervall, on = ['Mittel', 'Sorte'], how = 'left', validate = 'many_to_one')
 
 tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall_max'].isna(), 'Mittel'].unique())
 if len(tage_fehlend) > 0:
@@ -130,8 +106,8 @@ start_dates = last_dates['Datum'].unique()
 try:
     sbr_start = last_dates['Datum'].min().strftime('%d.%m.%Y')
     sbr_end = min([datetime.datetime(jahr,12,31), datetime.datetime.now()]).strftime('%d.%m.%Y')
-    sbr_files = export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'), download_dir = download_dir)
-    stationdata = pd.concat([open_sbr_export(Path(download_dir, i)) for i in sbr_files])
+    sbr_files = spINT.export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'), download_dir = download_dir)
+    stationdata = pd.concat([spINT.open_sbr_export(Path(download_dir, i)) for i in sbr_files])
     
 except Exception as e:
     stationdata = None
@@ -202,13 +178,13 @@ tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl
 logger.info('Sende email')
 params = np.unique(tbl_string.columns.get_level_values(0))
 environment = Environment(loader=FileSystemLoader("templates/"))
-template = environment.get_template("mail_body.html")
+template = environment.get_template("mail.html")
 mail_body = template.render(
     date=datetime.datetime.now(tz = timezone('Europe/Berlin')).strftime("%Y-%m-%d %H:%M"),
-    tables_dict = {i: format_tbl(tbl_string[i], tbl_abs[i], tbl_thresh_min[i], tbl_thresh_max[i]).to_html(classes = "tb") for i in params},
+    tables_dict = {i: spINT.format_tbl(tbl_string[i], tbl_abs[i], tbl_thresh_min[i], tbl_thresh_max[i]).to_html(classes = "tb") for i in params},
 )
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
-send_mail(mail_body, user, pwd)
+spINT.send_mail(mail_body, user, pwd)
 
 logger.info('Aktualisierung Behandlungsübersicht abgeschlossen.')
