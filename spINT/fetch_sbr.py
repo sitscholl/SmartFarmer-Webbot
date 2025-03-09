@@ -1,15 +1,16 @@
 import time
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import Select
-
 import pandas as pd
 import numpy as np
 from io import StringIO
 import datetime
 import re
+import sys
 from pathlib import Path
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
+from .utils import wait_for_page_stability, wait_and_click, wait_and_send_keys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,38 +38,31 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
     driver.get('https://www3.beratungsring.org/')
 
     ##Wait for page to be loaded
-    psource = driver.execute_script("return document.documentElement.outerHTML")
-    time.sleep(2)
-    while True:
-        psource_new = driver.execute_script("return document.documentElement.outerHTML")
-        if psource != psource_new:
-            psource = psource_new
-            time.sleep(2)
-        else:
-            break
+    # Wait for the page to stabilize
+    if not wait_for_page_stability(driver, check_interval=2, timeout=30):
+        logger.warning("Beratungsring landing page did not stabilize within timeout.")
+        sys.exit()
 
     ## Log in (if needed)
     if driver.find_elements(By.XPATH, '//span[normalize-space()="Login"]'):
 
-        if user is None:
-            raise ValueError(f"Beratungsring login required but user variable is None!")
-        if pwd is None:
-            raise ValueError("Beratungsring login required but pwd variable is None!")
+        if not user or not pwd:
+            raise ValueError(">SBR login required but username or password not provided.")
 
-        driver.find_element(By.XPATH, '//a[@class="login-link"]').click()
+        wait_and_click(driver, '//a[@class="login-link"]')
         ##Insert Email
-        driver.find_element(By.XPATH, '//input[@id="s_username"]').send_keys(user)
+        wait_and_send_keys(driver, '//input[@id="s_username"]', user)
         ##Insert Password
-        driver.find_element(By.XPATH, '//input[@id="s_password"]').send_keys(pwd)
+        wait_and_send_keys(driver, '//input[@id="s_password"]', pwd)
         ##Press Anmelden
-        driver.find_element(By.XPATH, '//button[@type="submit"]').click()
+        wait_and_click(driver, '//button[@type="submit"]')
 
         logger.info('SBR Anmeldung erfolgreich.')
     else:
         logger.info('Bereits bei SBR angemeldet.')
 
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '//span[normalize-space()="Mein SBR"]'))).click()
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[6]/ul/li[5]/a'))).click()
+    wait_and_click(driver, '//span[normalize-space()="Mein SBR"]')
+    wait_and_click(driver, '/html/body/div[1]/div[1]/div[1]/div[6]/ul/li[5]/a')
     driver.switch_to.window(driver.window_handles[-1])
 
     logger.info('Lade SBR Stationsdaten.')

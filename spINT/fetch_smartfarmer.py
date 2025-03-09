@@ -30,7 +30,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
     if "Bitte geben Sie Ihre E-Mail Adresse ein" in driver.page_source:
 
         if not user or not pwd:
-            raise ValueError("Login required but username or password not provided.")
+            raise ValueError("SmartFarmer login required but username or password not provided.")
 
         ##Insert Email
         wait_and_send_keys(driver, '//input[@type="email"]', user)
