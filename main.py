@@ -60,7 +60,7 @@ for f in Path(download_dir).glob("*"):
     f.unlink()
 
 ##Start drivers
-driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir)
+driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, timeout = 30)
 
 ## Download table from smartfarmer
 try:

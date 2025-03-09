@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
-from .utils import wait_for_page_stability, wait_and_click, wait_and_send_keys
+from .utils import wait_for_page_stability
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,32 +49,32 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
         if not user or not pwd:
             raise ValueError(">SBR login required but username or password not provided.")
 
-        wait_and_click(driver, '//a[@class="login-link"]')
+        driver.find_element(By.XPATH, '//a[@class="login-link"]').click()
         ##Insert Email
-        wait_and_send_keys(driver, '//input[@id="s_username"]', user)
+        driver.find_element(By.XPATH, '//input[@id="s_username"]').send_keys(user)
         ##Insert Password
-        wait_and_send_keys(driver, '//input[@id="s_password"]', pwd)
+        driver.find_element(By.XPATH, '//input[@id="s_password"]').send_keys(pwd)
         ##Press Anmelden
-        wait_and_click(driver, '//button[@type="submit"]')
+        driver.find_element(By.XPATH, '//button[@type="submit"]').click()
 
         logger.info('SBR Anmeldung erfolgreich.')
     else:
         logger.info('Bereits bei SBR angemeldet.')
 
-    wait_and_click(driver, '//span[normalize-space()="Mein SBR"]')
-    wait_and_click(driver, '/html/body/div[1]/div[1]/div[1]/div[6]/ul/li[5]/a')
+    driver.find_element(By.XPATH, '//span[normalize-space()="Mein SBR"]').click()
+    driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[6]/ul/li[5]/a').click()
     driver.switch_to.window(driver.window_handles[-1])
 
     logger.info('Lade SBR Stationsdaten.')
     driver.get("https://www.beratungsring.org/beratungsring/export_wetterdaten.php?tyid=207&L=0")
 
     ##End date
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_to"))).clear()
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_to"))).send_keys(end)
+    driver.find_element(By.ID, "datepicker_to").clear()
+    driver.find_element(By.ID, "datepicker_to").send_keys(end)
 
     ##Start date
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_from"))).clear()
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "datepicker_from"))).send_keys(start)
+    driver.find_element(By.ID, "datepicker_from").clear()
+    driver.find_element(By.ID, "datepicker_from").send_keys(start)
 
     ##Select Format
     st_select = Select(driver.find_element(By.NAME, 'ExportFormat'))
@@ -87,7 +87,7 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
         st_select.select_by_visible_text(snam)
 
         ##Export
-        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, "submit"))).click()
+        driver.find_element(By.NAME, "submit").click()
 
         #Make sure download finishes
         if download_dir is not None:

@@ -8,7 +8,7 @@ from pytz import timezone
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from .utils import wait_for_page_stability, wait_and_click, wait_and_send_keys
+from .utils import wait_for_page_stability
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,12 +33,12 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
             raise ValueError("SmartFarmer login required but username or password not provided.")
 
         ##Insert Email
-        wait_and_send_keys(driver, '//input[@type="email"]', user)
-        wait_and_click(driver, '//button[normalize-space()="weiter ►"]')
+        driver.find_element(By.XPATH, '//input[@type="email"]').send_keys(user)
+        driver.find_element(By.XPATH, '//button[normalize-space()="weiter ►"]').click()
 
         ##Insert Password
-        wait_and_send_keys(driver, '//input[@type="password"]', pwd)
-        wait_and_click(driver, '//button[normalize-space()="login"]')
+        driver.find_element(By.XPATH, '//input[@type="password"]').send_keys(pwd)
+        driver.find_element(By.XPATH, '//button[normalize-space()="login"]').click()
 
         logger.info('SmartFarmer Anmeldung erfolgreich')
     else:
@@ -60,9 +60,9 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
         driver.find_element(By.XPATH, '//button[normalize-space()="jetzt nicht"]').click()
 
     # Navigate through the menu to open the reports section
-    wait_and_click(driver, '//button[normalize-space()="Berichte"]')
-    wait_and_click(driver, '//div[normalize-space()="Maßnahmen"]')
-    wait_and_click(driver, '//div[normalize-space()="Liste"]')
+    driver.find_element(By.XPATH, '//button[normalize-space()="Berichte"]').click()
+    driver.find_element(By.XPATH, '//div[normalize-space()="Maßnahmen"]').click()
+    driver.find_element(By.XPATH, '//div[normalize-space()="Liste"]').click()
 
     # Select the desired year (using 'Kalenderjahr')
     WebDriverWait(driver, 20).until(EC.any_of(
@@ -71,7 +71,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
         )
     ).click()
     year_xpath = f'//span[normalize-space()="Kalenderjahr {jahr}"]'
-    wait_and_click(driver, year_xpath)
+    driver.find_element(By.XPATH, year_xpath).click()
 
     # Wait for all entries to load
     if not wait_for_page_stability(driver, check_interval=2, timeout=30):
@@ -80,7 +80,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
 
     ##Click on download button
     dbutton_xpath = '/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]'
-    wait_and_click(driver, dbutton_xpath)
+    driver.find_element(By.XPATH, dbutton_xpath).click()
 
     #Make sure download finishes
     if download_dir is not None:
@@ -93,6 +93,7 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
                 if (datetime.datetime.now(tz = timezone('Europe/Berlin')) - newest_ctime).total_seconds() < 10:
                     download_complete = True
                     break
+            time.sleep(2)
         if not download_complete:
             logger.warning("Download might not have completed within the expected time.")
             sys.exit()
