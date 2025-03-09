@@ -15,6 +15,8 @@ import logging
 import logging.config
 
 logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
+logging.getLogger("selenium").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Create the parser

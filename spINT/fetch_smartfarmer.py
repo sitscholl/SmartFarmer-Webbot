@@ -1,19 +1,15 @@
-import time
-import datetime
 import numpy as np
 import pandas as pd
 import sys
-from pathlib import Path
-from pytz import timezone
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from .utils import wait_for_page_stability
+from .utils import wait_for_page_stability, wait_for_download
 import logging
 
 logger = logging.getLogger(__name__)
 
-def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None):
+def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
     """
     Logs into SmartFarmer, navigates to the reports section, selects the specified year,
     triggers a download, and waits for the download to complete.
@@ -83,23 +79,8 @@ def fetch_smartfarmer(driver, jahr, user = None, pwd = None, download_dir = None
     driver.find_element(By.XPATH, dbutton_xpath).click()
 
     #Make sure download finishes
-    if download_dir is not None:
-        download_complete = False
-        start_time = datetime.datetime.now(tz = timezone('Europe/Berlin'))
-        while (datetime.datetime.now(tz = timezone('Europe/Berlin')) - start_time).total_seconds() < 60:
-            dfiles = list(Path(download_dir).glob('*.xlsx'))
-            if len(dfiles) > 0:
-                newest_ctime = datetime.datetime.fromtimestamp(dfiles[-1].stat().st_ctime, tz = timezone('Europe/Berlin'))
-                if (datetime.datetime.now(tz = timezone('Europe/Berlin')) - newest_ctime).total_seconds() < 10:
-                    download_complete = True
-                    break
-            time.sleep(2)
-        if not download_complete:
-            logger.warning("Download might not have completed within the expected time.")
-            sys.exit()
-    else:
-        time.sleep(10)
-    logger.info('SmartFarmer Daten heruntergeladen!')
+    dfile = wait_for_download(download_dir, extension = '.xlsx')
+    logger.info(f'SmartFarmer Daten heruntergeladen! ({dfile})')
 
 def reformat_sm_data(tbl):
     """
