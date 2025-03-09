@@ -44,6 +44,7 @@ def export_sbr(driver, start, end, station_name, user = None, pwd = None, downlo
     else:
         logger.info('Bereits bei SBR angemeldet.')
 
+    logger.debug('Opening Main SBR')
     driver.find_element(By.XPATH, '//span[normalize-space()="Mein SBR"]').click()
     driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[6]/ul/li[5]/a').click()
     driver.switch_to.window(driver.window_handles[-1])

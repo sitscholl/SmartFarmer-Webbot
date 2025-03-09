@@ -59,9 +59,9 @@ def wait_for_download(download_dir, expected_filename=None, extension=None, time
             time.sleep(stability_interval)
             size2 = candidate.stat().st_size
             if size1 == size2:
-                logger.debug(f"{size1} equals {size2}, returning {candidate}")
+                logger.debug(f"{size1}b equals {size2}b, returning {candidate}")
                 return candidate
-            logger.debug(f"{size1} != {size2}, waiting...")
+            logger.debug(f"{size1}b != {size2}b, waiting...")
         time.sleep(2)
 
     logger.warning("Download might not have completed within the expected time.")

@@ -41,6 +41,7 @@ def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
         logger.info('SmartFarmer bereits angemeldet.')
 
     # Wait until one of the expected elements is clickable (could be a pop-up or main menu)
+    logger.debug("Waiting for page to load...")
     WebDriverWait(driver, 30).until(
         EC.any_of(
             EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="später"]')),
@@ -56,11 +57,13 @@ def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
         driver.find_element(By.XPATH, '//button[normalize-space()="jetzt nicht"]').click()
 
     # Navigate through the menu to open the reports section
+    logger.debug('Navigating through menu')
     driver.find_element(By.XPATH, '//button[normalize-space()="Berichte"]').click()
     driver.find_element(By.XPATH, '//div[normalize-space()="Maßnahmen"]').click()
     driver.find_element(By.XPATH, '//div[normalize-space()="Liste"]').click()
 
     # Select the desired year (using 'Kalenderjahr')
+    logger.debug(f'Filtering year {jahr}')
     WebDriverWait(driver, 20).until(EC.any_of(
         EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Erntejahr")]')),
         EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Kalenderjahr")]'))
@@ -75,6 +78,7 @@ def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
         sys.exit()
 
     ##Click on download button
+    logger.debug('Downloading SmartFarmer table')
     dbutton_xpath = '/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]'
     driver.find_element(By.XPATH, dbutton_xpath).click()
 
