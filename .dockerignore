@@ -1,8 +1,5 @@
-downloads/*
-screenshots/*
-SmartFarmer/*
-app.py
 credentials.env
 gcloud_key.json
 Readme.md
+user_dir/
 .vscode/
