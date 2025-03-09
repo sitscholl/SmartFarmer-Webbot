@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def init_driver(user_dir, download_dir, headless = True, simulate_slow_conn = False):
+def init_driver(download_dir, user_dir = None, headless = True, simulate_slow_conn = False):
     
     logger.info('Starte browser...')
     # Specify driver options
@@ -23,7 +23,8 @@ def init_driver(user_dir, download_dir, headless = True, simulate_slow_conn = Fa
     options.add_argument('--dns-prefetch-disable')
 
     ## Set the download directory and user_data_dir
-    options.add_argument(f"user-data-dir={user_dir}")
+    if user_dir:
+        options.add_argument(f"user-data-dir={user_dir}")
     prefs = {
         "download.default_directory": download_dir,
         "download.directory_upgrade": True,
