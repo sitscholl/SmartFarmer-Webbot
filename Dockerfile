@@ -35,5 +35,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code & files
 COPY . .
 
+EXPOSE 8080
+
 # Default command to run the Python script
 ENTRYPOINT ["python", "main.py"]
