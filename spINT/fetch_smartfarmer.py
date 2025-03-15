@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 import sys
+import os
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from .utils import wait_for_page_stability, wait_for_download
+from .google import send_mail
 import logging
 
 logger = logging.getLogger(__name__)
@@ -78,9 +80,16 @@ def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
         sys.exit()
 
     ##Click on download button
-    logger.debug('Downloading SmartFarmer table')
-    dbutton_xpath = '/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]'
-    driver.find_element(By.XPATH, dbutton_xpath).click()
+    if "Keine passenden Einträge gefunden" in driver.page_source:
+        msg = f'Keine Einträge für Jahr {jahr} gefunden!'
+        logger.warning(msg)
+        user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
+        send_mail(msg, user, pwd)
+        sys.exit()
+    else:
+        logger.debug('Downloading SmartFarmer table')
+        dbutton_xpath = '/html/body/div[1]/div/div[1]/div[1]/div[1]/div/div[2]/div/div[2]/div/div/div[1]/span[2]/span/button[2]'
+        driver.find_element(By.XPATH, dbutton_xpath).click()
 
     #Make sure download finishes
     dfile = wait_for_download(download_dir, extension = '.xlsx')
