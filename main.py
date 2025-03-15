@@ -62,7 +62,7 @@ if platform.uname().system == 'Windows':
     user_dir = f"{Path.cwd()}\\user_dir"
 
 ##Start drivers
-driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, timeout = 30, headless=args.headless)
+driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, headless=args.headless)
 
 ## Download table from smartfarmer
 try:

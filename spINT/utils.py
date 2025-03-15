@@ -4,6 +4,7 @@ import time
 import sys
 from pathlib import Path
 from pytz import timezone
+from contextlib import contextmanager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,16 @@ def validate_date(date, target_format = "%d.%m.%Y"):
             raise ValueError
     except ValueError:
         raise ValueError(f'Start date needs to be in {target_format} format. Got {date}')
+
+@contextmanager
+def temporary_implicit_wait(driver, wait_time):
+    # Set the implicit wait to the new value
+    driver.implicitly_wait(wait_time)
+    try:
+        yield
+    finally:
+        # Restore the original implicit wait value
+        driver.implicitly_wait(30)
 
 ##Archived functions
 # from selenium.webdriver.support.ui import WebDriverWait

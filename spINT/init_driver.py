@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def init_driver(download_dir, user_dir = None, headless = True, simulate_slow_conn = False, timeout = 0):
+def init_driver(download_dir, user_dir = None, headless = True, simulate_slow_conn = False):
     
     logger.info('Starte browser...')
     # Specify driver options
@@ -47,6 +47,6 @@ def init_driver(download_dir, user_dir = None, headless = True, simulate_slow_co
             download_throughput=500 * 1024,  # maximal throughput
             upload_throughput=500 * 1024)  # maximal throughput
 
-    driver.implicitly_wait(timeout)
+    driver.implicitly_wait(30)
     logger.info('Browser gestartet.')
     return(driver)

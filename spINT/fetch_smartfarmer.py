@@ -7,6 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from .utils import wait_for_page_stability, wait_for_download
 from .google import send_mail
+from .utils import temporary_implicit_wait
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,13 +45,14 @@ def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
 
     # Wait until one of the expected elements is clickable (could be a pop-up or main menu)
     logger.debug("Waiting for page to load...")
-    WebDriverWait(driver, 30).until(
-        EC.any_of(
-            EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="später"]')),
-            EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="jetzt nicht"]')),
-            EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="Berichte"]')),
+    with temporary_implicit_wait(driver, 0):
+        WebDriverWait(driver, 30).until(
+            EC.any_of(
+                EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="später"]')),
+                EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="jetzt nicht"]')),
+                EC.element_to_be_clickable((By.XPATH, '//button[normalize-space()="Berichte"]')),
+            )
         )
-    )
 
     ##Close pop-ups if present
     if "App aktualisiert" in driver.page_source:
@@ -66,11 +68,12 @@ def fetch_smartfarmer(driver, jahr, download_dir, user = None, pwd = None):
 
     # Select the desired year (using 'Kalenderjahr')
     logger.debug(f'Filtering year {jahr}')
-    WebDriverWait(driver, 20).until(EC.any_of(
-        EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Erntejahr")]')),
-        EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Kalenderjahr")]'))
-        )
-    ).click()
+    with temporary_implicit_wait(driver, 0):
+        WebDriverWait(driver, 20).until(EC.any_of(
+            EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Erntejahr")]')),
+            EC.element_to_be_clickable((By.XPATH, '//span[contains(normalize-space(), "Kalenderjahr")]'))
+            )
+        ).click()
     year_xpath = f'//span[normalize-space()="Kalenderjahr {jahr}"]'
     driver.find_element(By.XPATH, year_xpath).click()
 
