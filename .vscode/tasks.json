@@ -24,11 +24,18 @@
         "problemMatcher": []
       },
       {
+        "label": "update-job",
+        "type": "shell",
+        "command": "echo 'Updating google cloud job. Choose region europe-west6 (should be nr. 23)'; gcloud run jobs update spritzintervall --image=europe-docker.pkg.dev/oberlenghof/spritzintervall/spritzintervall:latest",
+        "problemMatcher": []
+      },
+      {
         "label": "deploy-spritzintervall",
         "dependsOn": [
           "docker-build",
           "docker-tag",
-          "docker-push"
+          "docker-push",
+          "update-job"
         ],
         "dependsOrder": "sequence",
         "problemMatcher": []
