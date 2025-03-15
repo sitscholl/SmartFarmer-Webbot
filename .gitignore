@@ -7,4 +7,3 @@ credentials.env
 tests/*
 test*
 results/*
-.vscode/

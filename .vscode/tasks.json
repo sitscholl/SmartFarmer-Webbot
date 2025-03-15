@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "docker-build",
+        "type": "shell",
+        "command": "docker build -t spritzintervall .",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "docker-tag",
+        "type": "shell",
+        "command": "docker tag spritzintervall:latest europe-docker.pkg.dev/oberlenghof/spritzintervall/spritzintervall:latest",
+        "problemMatcher": []
+      },
+      {
+        "label": "docker-push",
+        "type": "shell",
+        "command": "docker push europe-docker.pkg.dev/oberlenghof/spritzintervall/spritzintervall:latest",
+        "problemMatcher": []
+      },
+      {
+        "label": "deploy-spritzintervall",
+        "dependsOn": [
+          "docker-build",
+          "docker-tag",
+          "docker-push"
+        ],
+        "dependsOrder": "sequence",
+        "problemMatcher": []
+      }
+    ]
+  }
+  
