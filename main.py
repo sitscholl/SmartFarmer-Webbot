@@ -34,6 +34,7 @@ parser.add_argument('--t1_factor', type=float, default=0.75,
                     help='factor for t1')
 parser.add_argument('-d', '--download_dir', default = TemporaryDirectory().name, help = 'Download directory')
 parser.add_argument('-u', '--user_dir', default = "user_dir", help = 'Directory with user data from chrome.')
+parser.add_argument('-he', '--headless', action = 'store_false', help = 'Disable headless browser.')
 
 # Parse the arguments
 args = parser.parse_args()
@@ -61,7 +62,7 @@ if platform.uname().system == 'Windows':
     user_dir = f"{Path.cwd()}\\user_dir"
 
 ##Start drivers
-driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, timeout = 30)
+driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, timeout = 30, headless=args.headless)
 
 ## Download table from smartfarmer
 try:
