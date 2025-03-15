@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser(description='Berechne den Zeitraum pro Wiese seit der letzten Behandlung.')
 
 # Add the arguments
-parser.add_argument('-j', '--jahr', type=int, default=2024,
+parser.add_argument('-j', '--jahr', type=int, default=2025,
                     help='the year to process')
 parser.add_argument('--default_mm', type=int, default=30,
                     help='default value for mm')
