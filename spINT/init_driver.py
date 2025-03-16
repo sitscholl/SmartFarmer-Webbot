@@ -1,11 +1,10 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from pathlib import Path
 import logging
 
 logger = logging.getLogger(__name__)
 
-def init_driver(download_dir, user_dir = None, headless = True, simulate_slow_conn = False):
+def init_driver(download_dir: str, user_dir = None, headless = True, simulate_slow_conn = False):
     
     logger.info('Starte browser...')
     # Specify driver options
