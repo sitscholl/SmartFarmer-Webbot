@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def wait_for_download(download_dir, expected_filename=None, extension=None, timeout=60, stability_interval=3):
+def wait_for_download(download_dir, pattern, timeout=60, stability_interval=3):
     """
     Waits for a file download to complete in the specified directory.
     
@@ -34,20 +34,13 @@ def wait_for_download(download_dir, expected_filename=None, extension=None, time
         SystemExit: Exits the program if the file isn’t detected or stabilized within the timeout.
     """
 
-    if not expected_filename and not extension:
-        raise ValueError("Either expected_filename or extension must be provided.")
-
     download_dir = Path(download_dir)
     start_time = datetime.datetime.now(tz=timezone('Europe/Berlin'))
 
-    # Build a search pattern: either exact filename or any file with the given extension.
-    pattern = expected_filename if expected_filename else f'*{extension}'
-
     while (datetime.datetime.now(tz=timezone('Europe/Berlin')) - start_time).total_seconds() < timeout:
         files = list(download_dir.glob(pattern))
-        # In extension mode, filter out typical temporary files used during download.
-        if extension and not expected_filename:
-            files = [f for f in files if not f.name.endswith(('.crdownload', '.part'))]
+        # filter out typical temporary files used during download.
+        files = [f for f in files if not f.name.endswith(('.crdownload', '.part'))]
         logger.debug(f"Found the following files in download folder that match the pattern: {files}")
 
         if files:
@@ -92,6 +85,19 @@ def validate_date(date, target_format = "%d.%m.%Y"):
             raise ValueError
     except ValueError:
         raise ValueError(f'Start date needs to be in {target_format} format. Got {date}')
+
+def split_dates(start: datetime.datetime, end: datetime.datetime, target_format: str = "%d.%m.%Y"):
+
+    if end < start:
+        raise ValueError(f"Start date cannot be smaller than end date. Got {start} and {end}")
+
+    if start.year != end.year:
+        return(
+            [start.strftime(target_format), datetime.datetime(start.year, 12, 31).strftime(target_format)],
+            [datetime.datetime(end.year, 1, 1).strftime(target_format), end.strftime(target_format)]
+        )
+    else:
+        return([start.strftime(target_format), end.strftime(target_format)])
 
 @contextmanager
 def temporary_implicit_wait(driver, wait_time):
