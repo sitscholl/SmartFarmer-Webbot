@@ -1,9 +1,16 @@
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import Select
+from spINT.utils import wait_for_page_stability, wait_for_download, validate_date
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 class SBRBase:
     # Registry to hold all page classes
     registry = {}
 
     def __init_subclass__(cls, page_name=None, **kwargs):
-        super().__init_subclass__(**kwargs)
         
         if page_name is None:
             page_name = cls.__name__.lower()
@@ -17,9 +24,65 @@ class SBRBase:
 
 # Example page definitions:
 class Home(SBRBase, page_name="home"):
-    def load(self):
-        print("Loading SBR Home Page")
-        self.driver.get('https://www3.beratungsring.org/')
+    def load(self, driver):
+        logger.info("Loading SBR Home Page")
+        driver.get('https://www3.beratungsring.org/')
+
+class MySBR(SBRBase, page_name='mysbr'):
+    def load(self, driver):
+        logger.info("Loading MySBR Page")
+        login_element = driver.find_element(By.CSS_SELECTOR, "a.login-link")
+
+        if login_element.text == 'personLOGIN':
+            raise ValueError('Need to log in before going to MySBR')
+        
+        driver.find_element(By.CSS_SELECTOR, "a.login-link").click()
+        driver.find_element(By.XPATH, "//a[text()='Beratungsbestätigungen']").click()
+        driver.switch_to.window(driver.window_handles[-1])
+
+        return self
+
+    def export_stationdata(self, station_name: str, start: str, end: str, driver, download_dir):
+        logger.info('Exporting SBR Stationsdaten.')
+
+        validate_date(start)
+        validate_date(end)
+
+        if isinstance(station_name, str):
+            station_name = [station_name]
+        
+        driver.find_element(By.XPATH, "//a[text()='Dienste']").click()
+        driver.find_element(By.XPATH, "//a[text()='Wetterdaten']").click()
+        driver.find_element(By.XPATH, "//a[text()='Wetterdaten exportieren']").click()
+
+        ##End date
+        driver.find_element(By.ID, "datepicker_to").clear()
+        driver.find_element(By.ID, "datepicker_to").send_keys(end)
+
+        ##Start date
+        driver.find_element(By.ID, "datepicker_from").clear()
+        driver.find_element(By.ID, "datepicker_from").send_keys(start)
+
+        ##Select Format
+        st_select = Select(driver.find_element(By.NAME, 'ExportFormat'))
+        st_select.select_by_visible_text('CSV-Datei')
+
+        st_select = Select(driver.find_element(By.NAME, 'st_id'))
+
+        exported_stations = []
+        for snam in station_name:
+            ##Select station
+            st_select.select_by_visible_text(snam)
+
+            ##Export
+            driver.find_element(By.NAME, "submit").click()
+
+            #Make sure download finishes
+            dfile = wait_for_download(download_dir, f"{snam.replace(' ', '_')}.csv")
+            exported_stations.append(dfile)
+            logger.info(f'Wetterdaten für station {snam} heruntergeladen.')
+                
+        return(exported_stations)
 
 
 # Central navigator that uses the registry:
@@ -30,10 +93,28 @@ class SBR:
 
     @property
     def is_logged_in(self):
-        return False
+        if not 'beratungsring' in self.driver.current_url:
+            self.go_to_page('home')
+        if self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text == 'personLOGIN':
+            return False
+        elif self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text == 'personMEIN SBR':
+            return True
+        else:
+            raise ValueError(f'Logged in status text could not be matched. Got {self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text}')
 
-    def login(self, usr, pwd):
-        pass
+
+    def login(self, user, pwd):
+        if not self.is_logged_in:
+            self.go_to_page('home')
+
+            driver.find_element(By.CSS_SELECTOR, "a.login-link").click()
+            driver.find_element(By.ID, "s_username").send_keys(user)
+            driver.find_element(By.ID, "s_password").send_keys(pwd)
+            driver.find_element(By.XPATH, '//button[@type="submit"]').click()
+
+            logger.info('SBR Anmeldung erfolgreich.')
+        else:
+            logger.info('Bereits bei SBR angemeldet.')
 
     def go_to_page(self, page_name: str):
         page_class = self.pages.get(page_name)
@@ -42,15 +123,33 @@ class SBR:
             raise ValueError(f"Page '{page_name}' not found. Choose one of {list(self.pages.keys())}")
 
         page_instance = page_class()
-        page_instance.load()
+        page_instance.load(driver = self.driver)
+        return page_instance
 
 # Example usage:
 if __name__ == '__main__':
-    # 'driver' would be your Selenium WebDriver instance.
-    driver = None  # placeholder for the Selenium driver
-    navigator = SBR(driver)
-    
-    # Navigate to different pages using the central registry.
-    navigator.go_to_page("home")
-    navigator.go_to_page("login")
-    navigator.is_logged_in
+
+    from spINT.init_driver import init_driver
+    import os
+    from dotenv import load_dotenv
+    import time
+    from tempfile import TemporaryDirectory
+    from pathlib import Path
+
+    load_dotenv("credentials.env")
+
+    download_dir = Path(TemporaryDirectory().name)
+    download_dir.mkdir(exist_ok = True, parents = True)
+    driver = init_driver(download_dir = str(download_dir), headless = False)
+
+    SBR = SBR(driver)
+    SBR.login(user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'))
+    time.sleep(3)
+    mySBR = SBR.go_to_page('mysbr')
+    sbr_files = mySBR.export_stationdata(
+        station_name="Latsch 1",
+        start="01.03.2025",
+        end="16.03.2025",
+        driver=driver,
+        download_dir=download_dir,
+    )
