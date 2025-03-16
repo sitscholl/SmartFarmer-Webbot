@@ -1,7 +1,9 @@
+import pandas as pd
+import datetime
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
-from spINT.utils import wait_for_page_stability, wait_for_download, validate_date
-
+from spINT.utils import wait_for_download, validate_date, split_dates
+from spINT.fetch_sbr import open_sbr_export
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,9 +26,10 @@ class SBRBase:
 
 # Example page definitions:
 class Home(SBRBase, page_name="home"):
+    address = 'https://www3.beratungsring.org/'
     def load(self, driver):
         logger.info("Loading SBR Home Page")
-        driver.get('https://www3.beratungsring.org/')
+        driver.get(self.address)
 
 class MySBR(SBRBase, page_name='mysbr'):
     def load(self, driver):
@@ -35,7 +38,7 @@ class MySBR(SBRBase, page_name='mysbr'):
 
         if login_element.text == 'personLOGIN':
             raise ValueError('Need to log in before going to MySBR')
-        
+
         driver.find_element(By.CSS_SELECTOR, "a.login-link").click()
         driver.find_element(By.XPATH, "//a[text()='Beratungsbestätigungen']").click()
         driver.switch_to.window(driver.window_handles[-1])
@@ -47,42 +50,48 @@ class MySBR(SBRBase, page_name='mysbr'):
 
         validate_date(start)
         validate_date(end)
+        dates_split = split_dates(
+            datetime.datetime.strptime(start, "%d.%m.%Y"),
+            datetime.datetime.strptime(end, "%d.%m.%Y"),
+        )
 
         if isinstance(station_name, str):
             station_name = [station_name]
-        
+
         driver.find_element(By.XPATH, "//a[text()='Dienste']").click()
         driver.find_element(By.XPATH, "//a[text()='Wetterdaten']").click()
         driver.find_element(By.XPATH, "//a[text()='Wetterdaten exportieren']").click()
 
-        ##End date
-        driver.find_element(By.ID, "datepicker_to").clear()
-        driver.find_element(By.ID, "datepicker_to").send_keys(end)
-
-        ##Start date
-        driver.find_element(By.ID, "datepicker_from").clear()
-        driver.find_element(By.ID, "datepicker_from").send_keys(start)
-
-        ##Select Format
-        st_select = Select(driver.find_element(By.NAME, 'ExportFormat'))
-        st_select.select_by_visible_text('CSV-Datei')
-
-        st_select = Select(driver.find_element(By.NAME, 'st_id'))
-
         exported_stations = []
-        for snam in station_name:
-            ##Select station
-            st_select.select_by_visible_text(snam)
+        for start_date, end_date in dates_split:
+            ##End date
+            driver.find_element(By.ID, "datepicker_to").clear()
+            driver.find_element(By.ID, "datepicker_to").send_keys(end_date)
 
-            ##Export
-            driver.find_element(By.NAME, "submit").click()
+            ##Start date
+            driver.find_element(By.ID, "datepicker_from").clear()
+            driver.find_element(By.ID, "datepicker_from").send_keys(start_date)
 
-            #Make sure download finishes
-            dfile = wait_for_download(download_dir, f"{snam.replace(' ', '_')}.csv")
-            exported_stations.append(dfile)
-            logger.info(f'Wetterdaten für station {snam} heruntergeladen.')
-                
-        return(exported_stations)
+            ##Select Format
+            st_select = Select(driver.find_element(By.NAME, 'ExportFormat'))
+            st_select.select_by_visible_text('CSV-Datei')
+
+            st_select = Select(driver.find_element(By.NAME, 'st_id'))
+
+            for snam in station_name:
+                ##Select station
+                st_select.select_by_visible_text(snam)
+
+                ##Export
+                driver.find_element(By.NAME, "submit").click()
+
+                # Make sure download finishes
+                dfile = wait_for_download(download_dir, f"{snam.replace(' ', '_')}*.csv")
+                exported_stations.append(open_sbr_export(dfile))
+                Path(dfile).unlink()
+                logger.info(f'Wetterdaten für station {snam} und Zeitraum {start_date} - {end_date} heruntergeladen.')
+
+        return(pd.concat(exported_stations).sort_values(['wst_codice', 'datetime']))
 
 
 # Central navigator that uses the registry:
@@ -93,15 +102,16 @@ class SBR:
 
     @property
     def is_logged_in(self):
-        if not 'beratungsring' in self.driver.current_url:
+        if self.driver.current_url != self.pages.get('home').address:
             self.go_to_page('home')
         if self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text == 'personLOGIN':
             return False
         elif self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text == 'personMEIN SBR':
             return True
         else:
-            raise ValueError(f'Logged in status text could not be matched. Got {self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text}')
-
+            raise ValueError(
+                f'Logged in status text could not be matched. Got {self.driver.find_elements(By.CSS_SELECTOR, "a.login-link")[0].text}'
+            )
 
     def login(self, user, pwd):
         if not self.is_logged_in:
@@ -135,6 +145,12 @@ if __name__ == '__main__':
     import time
     from tempfile import TemporaryDirectory
     from pathlib import Path
+    import logging
+    import logging.config
+
+    logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
+    logging.getLogger("selenium").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     load_dotenv("credentials.env")
 
@@ -148,7 +164,7 @@ if __name__ == '__main__':
     mySBR = SBR.go_to_page('mysbr')
     sbr_files = mySBR.export_stationdata(
         station_name="Latsch 1",
-        start="01.03.2025",
+        start="01.12.2024",
         end="16.03.2025",
         driver=driver,
         download_dir=download_dir,
