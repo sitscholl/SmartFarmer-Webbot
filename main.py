@@ -201,6 +201,6 @@ mail_body = template.render(
 )
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
-spINT.send_mail(mail_body, user, pwd)
+spINT.send_mail(mail_body, user, pwd, recipients = ['tscholl.simon@gmail.com', 'erlhof.latsch@gmail.com'])
 
 logger.info('Aktualisierung Behandlungsübersicht abgeschlossen.')
