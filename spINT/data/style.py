@@ -1,7 +1,8 @@
 import numpy as np
 import pandas as pd
 
-def format_tbl(tbl_string, vals, t1, t2, caption = None):
+##TODO: Implement as method in datatable class, iterate over params directly in method
+def style_tbl(tbl_string, vals, t1, t2, caption = None):
 
     colormat = np.where((vals >= t2).fillna(False),
                         'background-color: red',
