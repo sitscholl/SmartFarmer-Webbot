@@ -110,7 +110,7 @@ if len(tage_fehlend) > 0:
 last_dates['Behandlungsintervall_max'] = last_dates['Behandlungsintervall_max'].fillna(default_days)
 last_dates['Behandlungsintervall_min'] = last_dates['Behandlungsintervall_min'].fillna((last_dates['Behandlungsintervall_max'] * t1_factor).round(0))
 
-##Get last Spritzung for each field and reason. 
+##Get last Spritzung for each field and reason.
 ##If multiple mittel with same reason on same day, keep one with longest regenbestaendigkeit and behandlungsintervall
 last_dates = last_dates.sort_values(
     ["Datum", "Regenbestaendigkeit_max", "Behandlungsintervall_max"], ascending=False
@@ -147,40 +147,12 @@ driver.quit()
 ##Reformat table for output
 logger.info('Formatiere output Tabelle')
 val_cols = list( set(['Tage', 'Niederschlag']).intersection(last_dates.dropna(how = 'all', axis = 1).columns) )
-tbl_abs = (
-    last_dates.pivot(
-        columns="Grund", index=["Wiese", "Sorte"], values=val_cols
-    )
-    .round(0)
-    .astype(pd.Int16Dtype())
+data = spINT.DataTable(
+    data = last_dates,
+    val_cols = val_cols,
+    columns = "Grund",
+    index = ['Wiese', 'Sorte']
 )
-tbl_thresh_max = (
-    last_dates.pivot(
-        columns="Grund",
-        index=["Wiese", "Sorte"],
-        values=["Behandlungsintervall_max", "Regenbestaendigkeit_max"],
-    )
-    .rename(columns={"Regenbestaendigkeit_max": "Niederschlag", "Behandlungsintervall_max": "Tage"}, level=0)
-    .round(0)
-    .astype(pd.Int16Dtype())
-)[val_cols]
-tbl_thresh_min = (
-    last_dates.pivot(
-        columns="Grund",
-        index=["Wiese", "Sorte"],
-        values=["Behandlungsintervall_min", "Regenbestaendigkeit_min"],
-    )
-    .rename(columns={"Regenbestaendigkeit_min": "Niederschlag", "Behandlungsintervall_min": "Tage"}, level=0)
-    .round(0)
-    .astype(pd.Int16Dtype())
-)[val_cols]
-tbl_mittel = (
-    last_dates.pivot(
-        columns="Grund", index=["Wiese", "Sorte"], values="Mittel"
-    )
-)
-tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(pd.Int16Dtype())
-tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_mittel + ')'
 
 # Path("results").mkdir(parents=True, exist_ok=True)
 # tbl_string.to_csv('results/tbl_string.csv')
@@ -192,12 +164,17 @@ tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl
 
 ##Send email
 logger.info('Sende email')
-params = np.unique(tbl_string.columns.get_level_values(0))
+params = np.unique(data.get_string_data().columns.get_level_values(0))
 environment = Environment(loader=FileSystemLoader("template/"))
 template = environment.get_template("mail.html")
 mail_body = template.render(
-    date=datetime.datetime.now(tz = timezone('Europe/Berlin')).strftime("%Y-%m-%d %H:%M"),
-    tables_dict = {i: spINT.format_tbl(tbl_string[i], tbl_abs[i], tbl_thresh_min[i], tbl_thresh_max[i]).to_html(classes = "tb") for i in params},
+    date=datetime.datetime.now(tz=timezone("Europe/Berlin")).strftime("%Y-%m-%d %H:%M"),
+    tables_dict={
+        i: spINT.style_tbl(
+            data.get_string_data()[i], data.get_amounts()[i], data.get_thresholds(type = 'min')[i], data.get_thresholds(type = 'max')[i]
+        ).to_html(classes="tb")
+        for i in params
+    },
 )
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
