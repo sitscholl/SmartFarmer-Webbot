@@ -152,7 +152,7 @@ tbl_abs = (
         columns="Grund", index=["Wiese", "Sorte"], values=val_cols
     )
     .round(0)
-    .astype(int)
+    .astype(pd.Int16Dtype())
 )
 tbl_thresh_max = (
     last_dates.pivot(
@@ -162,7 +162,7 @@ tbl_thresh_max = (
     )
     .rename(columns={"Regenbestaendigkeit_max": "Niederschlag", "Behandlungsintervall_max": "Tage"}, level=0)
     .round(0)
-    .astype(int)
+    .astype(pd.Int16Dtype())
 )[val_cols]
 tbl_thresh_min = (
     last_dates.pivot(
@@ -172,14 +172,14 @@ tbl_thresh_min = (
     )
     .rename(columns={"Regenbestaendigkeit_min": "Niederschlag", "Behandlungsintervall_min": "Tage"}, level=0)
     .round(0)
-    .astype(int)
+    .astype(pd.Int16Dtype())
 )[val_cols]
 tbl_mittel = (
     last_dates.pivot(
         columns="Grund", index=["Wiese", "Sorte"], values="Mittel"
     )
 )
-tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(int)
+tbl_perc = ((tbl_abs / tbl_thresh_max) * 100).round(0).astype(pd.Int16Dtype())
 tbl_string = tbl_abs.astype(str) + '/' + tbl_thresh_max.astype(str) + ' (' + tbl_mittel + ')'
 
 # Path("results").mkdir(parents=True, exist_ok=True)

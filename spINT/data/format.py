@@ -3,9 +3,9 @@ import pandas as pd
 
 def format_tbl(tbl_string, vals, t1, t2, caption = None):
 
-    colormat = np.where(vals >= t2,
+    colormat = np.where((vals >= t2).fillna(False),
                         'background-color: red',
-                        np.where(vals >= t1, 
+                        np.where((vals >= t1).fillna(False), 
                             'background-color: orange', ''))
 
     styler = tbl_string.style.apply(lambda _: colormat, axis=None)
