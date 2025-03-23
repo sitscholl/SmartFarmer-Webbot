@@ -144,7 +144,7 @@ else:
 ## Close driver
 driver.quit()
 
-##Reformat table for output
+##Create dataclass for output
 logger.info('Formatiere output Tabelle')
 val_cols = list( set(['Tage', 'Niederschlag']).intersection(last_dates.dropna(how = 'all', axis = 1).columns) )
 data = spINT.DataTable(
@@ -154,14 +154,6 @@ data = spINT.DataTable(
     index = ['Wiese', 'Sorte']
 )
 
-# Path("results").mkdir(parents=True, exist_ok=True)
-# tbl_string.to_csv('results/tbl_string.csv')
-
-# tbl_formatted = format_tbl(tbl_string, tbl_abs, t1 = tbl_thresh_min, t2 = tbl_thresh_max, caption=f"Letzte Aktualisierung: {datetime.datetime.now(tz = timezone('Europe/Berlin')):%Y-%m-%d %H:%M}")
-
-##Send to gsheets
-# send_sheets(tbl_string)
-
 ##Send email
 logger.info('Sende email')
 params = np.unique(data.get_string_data().columns.get_level_values(0))
@@ -169,12 +161,7 @@ environment = Environment(loader=FileSystemLoader("template/"))
 template = environment.get_template("mail.html")
 mail_body = template.render(
     date=datetime.datetime.now(tz=timezone("Europe/Berlin")).strftime("%Y-%m-%d %H:%M"),
-    tables_dict={
-        i: spINT.style_tbl(
-            data.get_string_data()[i], data.get_amounts()[i], data.get_thresholds(type = 'min')[i], data.get_thresholds(type = 'max')[i]
-        ).to_html(classes="tb")
-        for i in params
-    },
+    tables_dict={i: data.style_tbl(param=i).to_html(classes="tb") for i in params},
 )
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')

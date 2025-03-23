@@ -1,5 +1,5 @@
 import pandas as pd
-
+import numpy as np
 
 class DataTable:
 
@@ -8,14 +8,12 @@ class DataTable:
         "Behandlungsintervall": "Tage"
     }
 
-    def __init__(self, data: pd.DataFrame, val_cols: list[str], columns: list[str], index: list[str], decimals: int = 0, dtype = pd.Int16Dtype()):
+    def __init__(self, data: pd.DataFrame, val_cols: list[str], columns: list[str], index: list[str]):
 
         self.data = data
         self.val_cols = val_cols
         self.columns = columns
         self.index = index
-        self.decimals = decimals
-        self.dtype = dtype
 
     def get_data(self):
         return self.data
@@ -32,7 +30,7 @@ class DataTable:
     def get_amounts(self):
         return self.data.pivot(
                 columns=self.columns, index=self.index, values=self.val_cols
-            ).round(self.decimals).astype(self.dtype)
+            ).round(1)
 
     def get_thresholds(self, type: str):
         if type == 'max':
@@ -50,7 +48,7 @@ class DataTable:
                     for i in self.colnames_mapping.keys()
                 },
                 level=0,
-            )[self.val_cols]#.astype(self.dtype)
+            )[self.val_cols].astype(int)
 
         elif type == "min":
             return self.data.pivot(
@@ -67,7 +65,7 @@ class DataTable:
                     for i in self.colnames_mapping.keys()
                 },
                 level=0,
-            )[self.val_cols]#.astype(self.dtype)
+            )[self.val_cols].astype(int)
         else:
             raise ValueError(f"Threshold type {type} not supported. Use 'min' or 'max'.")
 
@@ -80,7 +78,6 @@ class DataTable:
         return (
             ((self.get_amounts() / self.get_thresholds(type="max")) * 100)
             .round(0)
-            .astype(self.dtype)
         )
 
     def get_string_data(self):
@@ -92,3 +89,33 @@ class DataTable:
             + self.get_mittel_name()
             + ")"
         )
+
+    def style_tbl(self, param: str, caption: str = None):
+
+        vals = self.get_amounts()[param]
+        t1 = self.get_thresholds(type = 'min')[param]
+        t2 = self.get_thresholds(type = 'max')[param]
+
+        colormat = np.where((vals >= t2).fillna(False),
+                            'background-color: red',
+                            np.where((vals >= t1).fillna(False), 
+                                'background-color: orange', ''))
+
+        styler = self.get_string_data()[param].style.apply(lambda _: colormat, axis=None)
+
+        headers = {
+                "selector": "th",
+                "props": "border:1px solid #707B7C;border-collapse:collapse;padding:5px"
+            }
+        cells = {
+                "selector": "td",
+                "props": "border:1px solid #707B7C;border-collapse:collapse;padding:5px"
+            }  
+        full = {
+            "selector": "",
+            "props": [("border-collapse", "collapse"), ("border", "1px solid #707B7C")],
+        }
+
+        styler.set_table_styles([headers,cells,full])
+
+        return styler
