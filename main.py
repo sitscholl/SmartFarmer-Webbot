@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader
 import spINT
 import argparse
 from tempfile import TemporaryDirectory
+from webhandler.SBR_requests import SBR
 import logging
 import logging.config
 
@@ -77,6 +78,9 @@ except Exception as e:
     logger.error('SmartFarmer download fehlgeschlagen.', exc_info=True)
     sys.exit()
 
+## Close driver
+driver.quit()
+
 logger.info('Formatiere SmartFarmer Tabelle')
 ## Open in pandas
 filename = sorted(list(Path(download_dir).glob('*.xlsx')), key = lambda x: x.stat().st_ctime)[-1]
@@ -120,11 +124,14 @@ last_dates = last_dates.sort_values(
 start_dates = last_dates['Datum'].unique()
 
 try:
-    sbr_start = last_dates['Datum'].min().strftime('%d.%m.%Y')
-    sbr_end = min([datetime.datetime(jahr,12,31), datetime.datetime.now()]).strftime('%d.%m.%Y')
-    sbr_files = spINT.export_sbr(driver, start = sbr_start, end = sbr_end, station_name = 'Latsch 1', user = os.environ.get('SBR_USERNAME'), pwd = os.environ.get('SBR_PASSWORD'), download_dir = download_dir)
-    stationdata = pd.concat([spINT.open_sbr_export(Path(download_dir, i)) for i in sbr_files])
-    
+    with SBR(os.environ.get("SBR_USERNAME"), os.environ.get("SBR_PASSWORD")) as client:
+        stationdata = client.get_stationdata(
+            station_id="103",
+            start=last_dates['Datum'].min(),
+            end=datetime.datetime.now(),
+            type='meteo'
+        )
+
 except Exception as e:
     stationdata = None
     logger.error('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.', exc_info = True)
@@ -134,15 +141,12 @@ if stationdata is not None:
     logger.info('Berechne Niederschlagssummen')
     sums = []
     for start in start_dates:
-        sums.append(stationdata.loc[(stationdata['datetime'] >= start) & (stationdata['datetime'] < datetime.datetime.now()), 'niederschl'].sum())
+        sums.append(stationdata.loc[(stationdata['Datum'] >= start) & (stationdata['Datum'] < datetime.datetime.now()), 'Nied.'].sum())
     sums = pd.DataFrame({'Datum': start_dates, 'Niederschlag': sums})
 
     last_dates = last_dates.merge(sums, on = 'Datum', how = 'left')
 else:
     last_dates['Niederschlag'] = np.nan
-
-## Close driver
-driver.quit()
 
 ##Create dataclass for output
 logger.info('Formatiere output Tabelle')

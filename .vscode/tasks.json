@@ -2,6 +2,11 @@
     "version": "2.0.0",
     "tasks": [
       {
+        "label": "install WebHandler",
+        "type": "shell",
+        "command": "pip install ../2025_03_WebHandler",
+      },
+      {
         "label": "docker-build",
         "type": "shell",
         "command": "docker build -t spritzintervall .",
