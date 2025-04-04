@@ -29,6 +29,7 @@ RUN CHROMEDRIVER_VERSION=$(curl -sS https://googlechromelabs.github.io/chrome-fo
 
 # Install Python dependencies
 COPY requirements.txt /app/requirements.txt
+COPY ./2025_03_WebHandler/ /app/2025_03_WebHandler/
 WORKDIR /app
 RUN pip install --no-cache-dir -r requirements.txt
 

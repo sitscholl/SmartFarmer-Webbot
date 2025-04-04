@@ -7,9 +7,9 @@
         "command": "pip install ../2025_03_WebHandler",
       },
       {
-        "label": "docker-build",
+        "label": "docker-build (with copying webhandler)",
         "type": "shell",
-        "command": "docker build -t spritzintervall .",
+        "command": "cp -r ../2025_03_WebHandler ./2025_03_WebHandler; rm ./2025_03_WebHandler/.conda -r -force; docker build -t spritzintervall .; rm ./2025_03_WebHandler/ -r -force",
         "group": {
           "kind": "build",
           "isDefault": true
@@ -37,7 +37,7 @@
       {
         "label": "deploy-spritzintervall",
         "dependsOn": [
-          "docker-build",
+          "docker-build (with copying webhandler)",
           "docker-tag",
           "docker-push",
           "update-job"
