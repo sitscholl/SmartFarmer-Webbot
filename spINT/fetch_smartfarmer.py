@@ -107,8 +107,9 @@ def reformat_sm_data(tbl):
       - Splits and explodes the 'Grund' field.
     """
     tbl['Datum'] = pd.to_datetime(tbl['Datum'], format = "%d/%m/%Y")
-    tbl['Grund'] = np.where(tbl['Mittel'].isin(["Yaravita Stopit"]), 'Ca-Düngung', tbl['Grund'])
-    tbl['Grund'] = np.where(tbl['Mittel'].isin(["Epso Combitop", "Epso Top"]), 'Bittersalz', tbl['Grund'])
+    tbl['Grund'] = np.where(tbl['Mittel'].str.lower().isin(["yaravita stopit"]), 'Ca-Düngung', tbl['Grund'])
+    tbl['Grund'] = np.where(tbl['Mittel'].str.lower().isin(["epso combitop", "epso top"]), 'Bittersalz', tbl['Grund'])
+    tbl['Grund'] = np.where(tbl['Mittel'].str.lower().isin(["ats", "supreme n"]), 'Chemisches Ausdünnen', tbl['Grund'])
 
     tbl['Anlage'] = tbl['Anlage'].str.replace('Neuacker Klein', 'Neuacker')
     tbl['Wiese'] = tbl['Anlage'].str.split(' ', expand = True).iloc[:,0]

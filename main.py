@@ -91,7 +91,7 @@ tbl_sm = pd.read_csv(csv_name, encoding = 'latin-1')
 ## Calculate last date of Behandlung
 tbl_sm_re = spINT.reformat_sm_data(tbl_sm.copy())
 last_dates = tbl_sm_re.groupby(['Wiese', 'Sorte', 'Mittel', 'Grund'], as_index = False)['Datum'].max()
-last_dates = last_dates.loc[last_dates['Grund'].isin(["Apfelmehltau", "Apfelschorf", "Ca-Düngung", "Bittersalz"])]
+last_dates = last_dates.loc[last_dates['Grund'].isin(["Apfelmehltau", "Apfelschorf", "Blattdüngung", "Ca-Düngung", "Bittersalz"])]
 last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1))
 
 ## Add Regenbeständigkeit
@@ -169,6 +169,6 @@ mail_body = template.render(
 )
 
 user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
-spINT.send_mail(mail_body, user, pwd, recipients = ['tscholl.simon@gmail.com', 'erlhof.latsch@gmail.com'])
+spINT.send_mail(mail_body, user, pwd, recipients = ['tscholl.simon@gmail.com'])#, 'erlhof.latsch@gmail.com'])
 
 logger.info('Aktualisierung Behandlungsübersicht abgeschlossen.')
