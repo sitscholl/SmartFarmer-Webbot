@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Pflanzenschutz Übersicht</title>
+<style>
+  body { font-family: sans-serif; }
+  h1, h2 { text-align: center; color: #333; }
+  .report-time { text-align: center; color: #666; font-size: 0.9em; margin-bottom: 20px; }
+  .table-container { margin-bottom: 30px; }
+  .table-container h3 { text-align: center; color: #444; }
+  /* Add styles from reporter.py's set_table_styles here if needed, */
+  /* or rely on the inline styles applied by pandas Styler */
+  .dataframe {
+      border-collapse: collapse;
+      border: 1px solid #707B7C;
+      width: auto; /* Let table size itself */
+      margin-left: auto; /* Center table */
+      margin-right: auto;
+      margin-bottom: 15px; /* Space below table */
+  }
+  .dataframe th {
+      border: 1px solid #707B7C;
+      padding: 8px 10px; /* More padding */
+      text-align: center;
+      background-color: #e8e8e8; /* Lighter grey header */
+      font-weight: bold;
+  }
+    .dataframe th.level0 { /* Style multiindex headers */
+       font-size: 1.1em;
+   }
+    .dataframe th.level1 { /* Style multiindex headers */
+       font-size: 1em;
+   }
+  .dataframe td {
+      border: 1px solid #707B7C;
+      padding: 8px 10px;
+      text-align: center;
+      white-space: nowrap; /* Prevent wrapping in cells */
+  }
+   .dataframe tbody tr:nth-child(even) {
+       background-color: #f9f9f9; /* Subtle row striping */
+   }
+   .dataframe tbody tr:hover {
+       background-color: #f0f0f0; /* Highlight on hover */
+   }
+  .dataframe thead th.index_name { /* Targets the top-left corner */
+     background-color: #dcdcdc; /* Darker grey for corner */
+  }
+  .dataframe tbody th { /* Style the row index headers */
+      text-align: left;
+      font-weight: bold;
+      background-color: #f2f2f2;
+  }
+</style>
+</head>
+<body>
+
+<h1>Pflanzenschutz Übersicht</h1>
+<div class="report-time">Bericht generiert am: {{ report_date }}</div>
+
+{% if tables_dict %}
+  {% if 'Tage' in tables_dict %}
+  <div class="table-container">
+    <h3>Tage seit letzter Behandlung</h3>
+    {{ tables_dict['Tage'] | safe }}
+  </div>
+  {% endif %}
+
+  {% if 'Niederschlag' in tables_dict %}
+  <div class="table-container">
+    <h3>Niederschlag (mm) seit letzter Behandlung</h3>
+    {{ tables_dict['Niederschlag'] | safe }}
+  </div>
+  {% endif %}
+
+  {% set other_tables = tables_dict.keys() - ['Tage', 'Niederschlag'] %}
+  {% if other_tables %}
+      {% for table_key in other_tables %}
+           <div class="table-container">
+               <h3>{{ table_key | title }}</h3> {# Simple title generation #}
+               {{ tables_dict[table_key] | safe }}
+           </div>
+       {% endfor %}
+   {% endif %}
+
+{% else %}
+  <p style="text-align: center; color: red;">Keine Daten zur Anzeige vorhanden.</p>
+{% endif %}
+
+</body>
+</html>

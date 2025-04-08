@@ -1,174 +1,193 @@
-import numpy as np
-import pandas as pd
-from pathlib import Path
-import datetime
-import platform
-import os
-import sys
-from dotenv import load_dotenv
-from xlsx2csv import Xlsx2csv
-from pytz import timezone
-from jinja2 import Environment, FileSystemLoader
-import spINT
-import argparse
-from tempfile import TemporaryDirectory
-from webhandler.SBR_requests import SBR
+# plant_protection_report/main.py
 import logging
 import logging.config
+import sys
+import datetime # Keep this import
+from contextlib import ExitStack # For managing multiple resources
 
-logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
-logging.getLogger("selenium").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logger = logging.getLogger(__name__)
+# Load custom exceptions and config loader first
+# ConfigError is now defined in config.py
+from config import load_configuration, FetchError, ProcessingError, ReportError, ConfigError
 
-# Create the parser
-parser = argparse.ArgumentParser(description='Berechne den Zeitraum pro Wiese seit der letzten Behandlung.')
+# Import components (paths might need slight adjustment if you renamed spint)
+from spint.utils.web_driver import init_driver, close_driver
+from spint.clients.smartfarmer_client import SmartFarmerClient
+from spint.clients.sbr_client import SBRClient
+from spint.data_loaders.static_data import StaticDataLoader
+from spint.processing.data_processor import DataProcessor
+from spint.reporting.reporter import Reporter
+import pandas as pd # Import pandas here if needed
 
-# Add the arguments
-parser.add_argument('-j', '--jahr', type=int, default=2025,
-                    help='the year to process')
-parser.add_argument('--default_mm', type=int, default=30,
-                    help='default value for mm')
-parser.add_argument('--default_days', type=int, default=14,
-                    help='default value for days')
-parser.add_argument('--t1_factor', type=float, default=0.75,
-                    help='factor for t1')
-parser.add_argument('-d', '--download_dir', default = TemporaryDirectory().name, help = 'Download directory')
-parser.add_argument('-u', '--user_dir', default = "user_dir", help = 'Directory with user data from chrome.')
-parser.add_argument('-he', '--headless', action = 'store_false', help = 'Disable headless browser.')
-
-# Parse the arguments
-args = parser.parse_args()
-
-jahr = args.jahr
-default_mm = args.default_mm
-default_days = args.default_days
-t1_factor = args.t1_factor
-download_dir = args.download_dir
-user_dir = args.user_dir
-
-# Create download directory
-Path(download_dir).mkdir(exist_ok = True, parents = True)
-
-logger.info(f"Programm gestartet: Jahr = {jahr}, default_mm = {default_mm}, default_tage = {default_days}, t1_factor = {t1_factor}")
-
-load_dotenv("credentials.env")
-
-tbl_regenbestaendigkeit = spINT.load_regenbestaendigkeit("data/regenbestaendigkeit.csv", t1_factor = t1_factor)
-tbl_sortenanfaelligkeit = spINT.load_sortenanfaelligkeit("data/sortenanfaelligkeit.csv")
-tbl_behandlungsintervall = spINT.load_behandlungsintervall("data/behandlungsintervall.csv", tbl_sortenanfaelligkeit)
-
-## On windows, full path to user_dir needed
-if platform.uname().system == 'Windows':
-    user_dir = f"{Path.cwd()}\\user_dir"
-
-##Start drivers
-driver = spINT.init_driver(download_dir=download_dir, user_dir=user_dir, headless=args.headless)
-
-## Download table from smartfarmer
-try:
-    spINT.fetch_smartfarmer(
-        driver,
-        jahr,
-        user=os.environ.get("SM_USERNAME"),
-        pwd=os.environ.get("SM_PASSWORD"),
-        download_dir=download_dir,
-    )
-except Exception as e:
-    logger.error('SmartFarmer download fehlgeschlagen.', exc_info=True)
-    sys.exit()
-
-## Close driver
-driver.quit()
-
-logger.info('Formatiere SmartFarmer Tabelle')
-## Open in pandas
-filename = sorted(list(Path(download_dir).glob('*.xlsx')), key = lambda x: x.stat().st_ctime)[-1]
-csv_name = str(filename).replace('.xlsx', '.csv')
-Xlsx2csv(filename, outputencoding="latin-1").convert(csv_name)
-tbl_sm = pd.read_csv(csv_name, encoding = 'latin-1')
-
-## Calculate last date of Behandlung
-tbl_sm_re = spINT.reformat_sm_data(tbl_sm.copy())
-last_dates = tbl_sm_re.groupby(['Wiese', 'Sorte', 'Mittel', 'Grund'], as_index = False)['Datum'].max()
-last_dates = last_dates.loc[last_dates['Grund'].isin(["Apfelmehltau", "Apfelschorf", "Blattdüngung", "Ca-Düngung", "Bittersalz"])]
-last_dates['Tage'] = np.floor((datetime.datetime.now() - last_dates['Datum']) / datetime.timedelta(days = 1))
-
-## Add Regenbeständigkeit
-last_dates = last_dates.merge(tbl_regenbestaendigkeit[['Mittel', 'Regenbestaendigkeit_min', 'Regenbestaendigkeit_max']], on = 'Mittel', how = 'left', validate = 'many_to_one')
-
-mittel_fehlend = np.sort(last_dates.loc[last_dates['Regenbestaendigkeit_max'].isna(), 'Mittel'].unique())
-if len(mittel_fehlend) > 0:
-    mittel_join = "\t" + '\n\t'.join(mittel_fehlend)
-    logger.warning(f"Für folgende {len(mittel_fehlend)} Mittel wurde keine Regenbeständigkeit in der Mitteldatenbank gefunden und ein Standardwert von {default_mm}mm angenommen: \n{mittel_join}")
-last_dates['Regenbestaendigkeit_max'] = last_dates['Regenbestaendigkeit_max'].fillna(default_mm)
-last_dates['Regenbestaendigkeit_min'] = last_dates['Regenbestaendigkeit_min'].fillna((last_dates['Regenbestaendigkeit_max'] * t1_factor))
-
-## Add Behandlungsintervall
-last_dates = last_dates.merge(tbl_behandlungsintervall, on = ['Mittel', 'Sorte'], how = 'left', validate = 'many_to_one')
-
-tage_fehlend = np.sort(last_dates.loc[last_dates['Behandlungsintervall_max'].isna(), 'Mittel'].unique())
-if len(tage_fehlend) > 0:
-    tage_join = "\t" + '\n\t'.join(mittel_fehlend)
-    logger.warning(f"Für folgende {len(tage_fehlend)} Mittel wurde kein Behandlungsintervall in der Mitteldatenbank gefunden und ein Standardwert von {default_days} tagen angenommen: \n{tage_join}")
-last_dates['Behandlungsintervall_max'] = last_dates['Behandlungsintervall_max'].fillna(default_days)
-last_dates['Behandlungsintervall_min'] = last_dates['Behandlungsintervall_min'].fillna((last_dates['Behandlungsintervall_max'] * t1_factor).round(0))
-
-##Get last Spritzung for each field and reason.
-##If multiple mittel with same reason on same day, keep one with longest regenbestaendigkeit and behandlungsintervall
-last_dates = last_dates.sort_values(
-    ["Datum", "Regenbestaendigkeit_max", "Behandlungsintervall_max"], ascending=False
-).drop_duplicates(subset=["Wiese", "Sorte", "Grund"], keep="first")
-
-# Get stationdata from SBR
-start_dates = last_dates['Datum'].unique()
+# --- Setup Logging ---
+# Load basic config first, then try fileConfig, then potentially adjust level from YAML
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger() # Get root logger
 
 try:
-    with SBR(os.environ.get("SBR_USERNAME"), os.environ.get("SBR_PASSWORD")) as client:
-        stationdata = client.get_stationdata(
-            station_id="103",
-            start=last_dates['Datum'].min(),
-            end=datetime.datetime.now(),
-            type='meteo'
-        )
+    # Load configuration early to potentially get log level
+    temp_config = load_configuration() # Load once to get log level
+    log_level_str = temp_config.get('log_level', 'INFO').upper()
+    log_level = getattr(logging, log_level_str, logging.INFO)
+    logger.info(f"Setting log level to {log_level_str} based on configuration.")
+    logger.setLevel(log_level) # Set level for root logger
 
+    # Now try loading the more detailed config file
+    logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
+    logger.info("Successfully loaded logging configuration from .config/logging.conf")
+
+    # Suppress noisy logs from libraries (apply AFTER fileConfig)
+    logging.getLogger("selenium").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("webdriver_manager").setLevel(logging.WARNING)
+    logging.getLogger("WDM").setLevel(logging.WARNING)
+    logging.getLogger("googleapiclient").setLevel(logging.WARNING) # If using sheets
+
+except ConfigError as e: # Catch config loading errors early
+     logger.critical(f"CRITICAL: Failed to load configuration: {e}. Exiting.")
+     sys.exit(1)
 except Exception as e:
-    stationdata = None
-    logger.error('Beratungsring download fehlgeschlagen. Niederschlagsdaten nicht verfügbar.', exc_info = True)
-    # driver.save_screenshot(f'screenshots/SBR_Error_{datetime.datetime.now().strftime("%Y%m%d_%H%M")}.png')
+     logger.warning(f"Warning: Could not configure logging from file: {e}. Using level from config/basic setup.")
+     # Ensure level set previously from YAML/basic is retained if fileConfig fails
 
-if stationdata is not None:
-    logger.info('Berechne Niederschlagssummen')
-    sums = []
-    for start in start_dates:
-        sums.append(stationdata.loc[(stationdata['Datum'] >= start) & (stationdata['Datum'] < datetime.datetime.now()), 'Nied.'].sum())
-    sums = pd.DataFrame({'Datum': start_dates, 'Niederschlag': sums})
 
-    last_dates = last_dates.merge(sums, on = 'Datum', how = 'left')
-else:
-    last_dates['Niederschlag'] = np.nan
+# --- Main Execution Logic ---
+def run_report_generation():
+    """Main function to orchestrate the report generation process."""
+    config = None
+    driver = None
+    reporter_instance = None # To allow sending failure emails
+    exit_code = 0 # Assume success initially
 
-##Create dataclass for output
-logger.info('Formatiere output Tabelle')
-val_cols = list( set(['Tage', 'Niederschlag']).intersection(last_dates.dropna(how = 'all', axis = 1).columns) )
-data = spINT.DataTable(
-    data = last_dates,
-    val_cols = val_cols,
-    columns = "Grund",
-    index = ['Wiese', 'Sorte']
-)
+    try:
+        logger.info("--- Starting Pflanzenschutz Report Generation ---")
+        # Configuration is already loaded once for logging, load again or reuse temp_config
+        config = load_configuration() # Or config = temp_config if it's guaranteed valid
 
-##Send email
-logger.info('Sende email')
-params = np.unique(data.get_string_data().columns.get_level_values(0))
-environment = Environment(loader=FileSystemLoader("template/"))
-template = environment.get_template("mail.html")
-mail_body = template.render(
-    date=datetime.datetime.now(tz=timezone("Europe/Berlin")).strftime("%Y-%m-%d %H:%M"),
-    tables_dict={i: data.style_tbl(param=i).to_html(classes="tb") for i in params},
-)
+        # --- Initialize Components ---
+        logger.info("Initializing components...")
+        static_loader = StaticDataLoader(config['static_data_path'], config['t1_factor'])
+        # Driver initialization needs careful error handling
+        try:
+            driver = init_driver(
+                download_dir=config['download_dir'],
+                user_dir=config['user_dir'],
+                headless=config['run_headless']
+            )
+        except Exception as e:
+            logger.critical(f"Failed to initialize WebDriver: {e}", exc_info=True)
+            raise FetchError(f"WebDriver initialization failed: {e}") from e # Raise specific error
 
-user, pwd = os.environ.get('GM_USERNAME'), os.environ.get('GM_APPKEY')
-spINT.send_mail(mail_body, user, pwd, recipients = ['tscholl.simon@gmail.com'])#, 'erlhof.latsch@gmail.com'])
+        sm_client = SmartFarmerClient(driver, config['sm_user'], config['sm_pwd'], config['download_dir'])
+        sbr_client = SBRClient(config['sbr_user'], config['sbr_pwd'])
+        processor = DataProcessor(config, None) # Static data loaded later
+        reporter_instance = Reporter(config) # Initialize reporter
+        logger.info("Components initialized.")
 
-logger.info('Aktualisierung Behandlungsübersicht abgeschlossen.')
+        # --- Fetch Data ---
+        logger.info("--- Fetching Data ---")
+        smartfarmer_data = sm_client.fetch_report_data(config['year'])
+
+        sbr_data = None
+        if not smartfarmer_data.empty and 'Datum' in smartfarmer_data.columns:
+            try:
+                sm_dates = pd.to_datetime(smartfarmer_data['Datum'], format="%d/%m/%Y", errors='coerce').dropna()
+                if not sm_dates.empty:
+                    min_date = sm_dates.min()
+                    # Ensure min_date is not NaT
+                    if pd.notna(min_date):
+                         max_date = datetime.datetime.now()
+                         # Check if min_date has timezone, add if necessary (assuming Europe/Rome based on SBRClient)
+                         if min_date.tzinfo is None:
+                             min_date = min_date.tz_localize('Europe/Rome', ambiguous='infer')
+                         logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d')} to now.")
+                         sbr_data = sbr_client.fetch_weather_data(config['sbr_station_id'], min_date, max_date)
+                    else:
+                         logger.warning("Minimum date from SmartFarmer data is invalid (NaT). Skipping SBR fetch.")
+                else:
+                    logger.warning("No valid dates found in SmartFarmer data after conversion. Cannot determine SBR range.")
+            except FetchError as e:
+                logger.warning(f"Failed to fetch SBR data: {e}. Proceeding without rainfall data.")
+            except Exception as e:
+                logger.warning(f"Unexpected error preparing for SBR fetch: {e}. Proceeding without rainfall data.", exc_info=True)
+        else:
+            logger.warning("SmartFarmer data is empty or missing 'Datum' column. Skipping SBR fetch.")
+
+        logger.info("--- Data Fetching Complete ---")
+
+        # --- Process Data ---
+        logger.info("--- Processing Data ---")
+        processor.static_data = static_loader.load_all()
+        processed_data = processor.process(smartfarmer_data, sbr_data)
+        logger.info("--- Data Processing Complete ---")
+
+        # --- Generate and Send Report ---
+        logger.info("--- Generating and Sending Report ---")
+        html_report = reporter_instance.generate_html_report(processed_data)
+        reporter_instance.send_email(html_report)
+
+        # Optional: Send to Google Sheets
+        # gs_config = config.get('google_sheets_config')
+        # if gs_config and not processed_data.empty:
+        #     try:
+        #         reporter_instance.send_to_google_sheets(
+        #             processed_data,
+        #             gs_config.get('spreadsheet_name', 'DefaultSpreadsheet'),
+        #             gs_config.get('worksheet_name', 'DefaultWorksheet')
+        #         )
+        #     except ReportError as e:
+        #          logger.warning(f"Could not send data to Google Sheets: {e}")
+
+        logger.info("--- Reporting Complete ---")
+
+    # --- Error Handling ---
+    except (ConfigError, FetchError, ProcessingError, ReportError) as e:
+        logger.critical(f"Report generation failed: {e}", exc_info=True)
+        # Send failure notification email if possible
+        try:
+            if config and reporter_instance: # Check if config/reporter were initialized
+                subject = f"FEHLER: Pflanzenschutz Report Generation Failed - {datetime.date.today().strftime('%Y-%m-%d')}"
+                body = f"<h1>Report Generation Failed</h1><p><strong>Error Type:</strong> {type(e).__name__}</p><p><strong>Message:</strong> {e}</p><p>Check application logs for details.</p>"
+                # Use a simplified send method or reuse reporter's method carefully
+                # Creating a simple message here:
+                from email.message import EmailMessage
+                import smtplib
+
+                msg = EmailMessage()
+                msg["Subject"] = subject
+                msg['From'] = config.get('gm_user', 'error@example.com')
+                msg['To'] = ", ".join(config.get('email_recipients', []))
+                msg.set_content("Report generation failed. Please check logs. Enable HTML for details.")
+                msg.add_alternative(body, subtype="html")
+
+                if config.get('gm_user') and config.get('gm_pwd') and config.get('email_recipients'):
+                    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
+                        smtp_server.login(config['gm_user'], config['gm_pwd'])
+                        smtp_server.send_message(msg)
+                    logger.info("Sent failure notification email.")
+                else:
+                    logger.warning("Could not send failure email: Gmail config incomplete.")
+
+        except Exception as mail_err:
+            logger.error(f"Failed to send failure notification email: {mail_err}", exc_info=True)
+        exit_code = 1 # Indicate failure
+    except Exception as e:
+        logger.critical(f"An unexpected critical error occurred: {e}", exc_info=True)
+        exit_code = 1 # Indicate failure
+
+    # --- Cleanup ---
+    finally:
+        logger.info("--- Cleaning up resources ---")
+        if driver:
+            close_driver(driver)
+        # Cleanup temp dir logic might need adjustment if using default from YAML
+        # The TemporaryDirectory() object needs to be stored if created in config loading
+        # For simplicity now, assume download_dir is managed manually or is persistent
+
+        logger.info(f"--- Report Generation Finished with exit code {exit_code} ---")
+        sys.exit(exit_code) # Exit with appropriate code
+
+
+# --- Script Entry Point ---
+if __name__ == "__main__":
+    # No command line args needed here anymore unless you add specific overrides
+    run_report_generation()

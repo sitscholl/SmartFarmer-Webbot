@@ -1,0 +1,47 @@
+# General application settings
+general:
+  year: 2025 # The primary year to process
+  log_level: INFO # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+# Paths for data, templates, etc. (relative to project root or absolute)
+paths:
+  download_dir: "downloads"       # Default directory for browser downloads
+  user_dir: "user_dir"            # Chrome user profile directory
+  static_data_dir: "data"         # Location of static CSV files
+  template_dir: "templates"       # Location of Jinja2 templates
+  google_creds_file: "gcloud_key.json" # Path to Google Cloud service account key
+
+# Thresholds and default values for processing
+thresholds:
+  default_mm: 30      # Default rainfall resistance (mm) if missing in static data
+  default_days: 14    # Default treatment interval (days) if missing in static data
+  t1_factor: 0.75     # Factor for calculating the lower warning threshold (T1)
+
+# SmartFarmer specific settings
+smartfarmer:
+  headless: true      # Run the browser in headless mode (true/false)
+  # Names of environment variables holding the credentials
+  username_env: SM_USERNAME
+  password_env: SM_PASSWORD
+
+# SBR (Beratungsring) specific settings
+sbr:
+  station_id: "103"   # Weather station ID to use
+  # Names of environment variables holding the credentials
+  username_env: SBR_USERNAME
+  password_env: SBR_PASSWORD
+
+# Gmail settings for sending reports
+gmail:
+  # Names of environment variables holding the credentials
+  username_env: GM_USERNAME
+  password_env: GM_APPKEY
+  # List of email addresses to send the report to
+  recipients:
+    - "tscholl.simon@gmail.com"
+    # - "erlhof.latsch@gmail.com" # Add more recipients here
+
+# Google Sheets settings (optional)
+# google_sheets:
+#   spreadsheet_name: "Behandlungsübersicht"
+#   worksheet_name: "ProcessedData"
