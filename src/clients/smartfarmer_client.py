@@ -2,6 +2,7 @@
 import logging
 import time
 import pandas as pd
+from xlsx2csv import Xlsx2csv
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -189,6 +190,11 @@ class SmartFarmerClient:
             # self.driver.save_screenshot("smartfarmer_download_error.png")
             raise FetchError(f"Failed to download SmartFarmer report: {e}")
 
+    def _open_xlsx(self, file):
+        csv_name = str(file).replace('.xlsx', '.csv')
+        Xlsx2csv(file, outputencoding="latin-1").convert(csv_name)
+        return pd.read_csv(csv_name, encoding = 'latin-1')
+
     def fetch_report_data(self, year):
         """Logs in, navigates, downloads the report, and reads it into a DataFrame."""
         try:
@@ -199,7 +205,7 @@ class SmartFarmerClient:
 
             logger.info(f"Reading downloaded Excel file: {downloaded_file_path}")
             # Use pandas to read the excel file directly
-            df = pd.read_excel(downloaded_file_path)
+            df = self._open_xlsx(downloaded_file_path)
             logger.info(f"Successfully read SmartFarmer data. Shape: {df.shape}")
 
             # Optional: Delete the downloaded file after reading

@@ -1,7 +1,8 @@
 import logging
 import logging.config
 import sys
-import datetime # Keep this import
+import datetime
+from pytz import timezone
 from webhandler.SBR_requests import SBR
 
 # Load custom exceptions and config loader first
@@ -74,10 +75,10 @@ def run_report_generation():
                     min_date = sm_dates.min()
                     # Ensure min_date is not NaT
                     if pd.notna(min_date):
-                        max_date = datetime.datetime.now()
+                        max_date = datetime.datetime.now(tz = timezone('Europe/Rome'))
                         # Check if min_date has timezone, add if necessary (assuming Europe/Rome based on SBRClient)
                         if min_date.tzinfo is None:
-                            min_date = min_date.tz_localize('Europe/Rome', ambiguous='infer')
+                            min_date = min_date.tz_localize('Europe/Rome')
                         logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d')} to now.")
                         with SBR(config['sbr_user'], config['sbr_pwd']) as client:
                             sbr_data = client.get_stationdata(

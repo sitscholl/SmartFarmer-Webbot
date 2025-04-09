@@ -236,27 +236,26 @@ class DataProcessor:
             return treatments_df
 
         # Ensure SBR data has necessary columns and correct types
-        if 'datetime' not in sbr_df.columns or 'niederschl' not in sbr_df.columns:
-             logger.error("SBR data missing 'datetime' or 'niederschl' column for rainfall calculation.")
+        if 'Datum' not in sbr_df.columns or 'Nied.' not in sbr_df.columns:
+             logger.error("SBR data missing 'Datum' or 'Nied.' column for rainfall calculation.")
              treatments_df['Niederschlag'] = np.nan
              return treatments_df
-        if not pd.api.types.is_datetime64_any_dtype(sbr_df['datetime']):
-             sbr_df['datetime'] = pd.to_datetime(sbr_df['datetime'], errors='coerce')
-             logger.warning("Converted SBR 'datetime' column type.")
-        if not pd.api.types.is_numeric_dtype(sbr_df['niederschl']):
-            sbr_df['niederschl'] = pd.to_numeric(sbr_df['niederschl'], errors='coerce')
-            logger.warning("Converted SBR 'niederschl' column type.")
+        if not pd.api.types.is_datetime64_any_dtype(sbr_df['Datum']):
+             sbr_df['Datum'] = pd.to_datetime(sbr_df['Datum'], errors='coerce')
+             logger.warning("Converted SBR 'Datum' column type.")
+        if not pd.api.types.is_numeric_dtype(sbr_df['Nied.']):
+            sbr_df['Nied.'] = pd.to_numeric(sbr_df['Nied.'], errors='coerce')
+            logger.warning("Converted SBR 'Nied.' column type.")
 
         # Make SBR datetime timezone aware to match treatments_df['Datum'] and current_time
-        if sbr_df['datetime'].dt.tz is None:
-            logger.debug("Making SBR datetime timezone-aware (assuming Europe/Rome).")
-            sbr_df['datetime'] = sbr_df['datetime'].dt.tz_localize('Europe/Rome', ambiguous='infer')
+        if sbr_df['Datum'].dt.tz is None:
+            logger.debug("Making SBR Datum timezone-aware (assuming Europe/Rome).")
+            sbr_df['Datum'] = sbr_df['Datum'].dt.tz_localize('Europe/Rome', ambiguous='infer')
 
 
         # Prepare for merging/lookup: Sort SBR data by time
-        sbr_sorted = sbr_df.sort_values('datetime').set_index('datetime')
+        sbr_sorted = sbr_df.sort_values('Datum').set_index('Datum')
 
-        results = []
         unique_start_dates = treatments_df['Datum'].unique()
 
         # Calculate sums efficiently
@@ -271,7 +270,7 @@ class DataProcessor:
             # but >= start and < now should work.
             relevant_rain = sbr_sorted[(sbr_sorted.index >= start_date) & (sbr_sorted.index < self.current_time)]
             # Sum the 'niederschl' column, handle NaNs
-            total_rain = relevant_rain['niederschl'].sum(skipna=True)
+            total_rain = relevant_rain['Nied.'].sum(skipna=True)
             rainfall_sums[start_date] = round(total_rain, 1) # Round to one decimal
 
         # Map the calculated sums back to the treatments DataFrame
