@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import logging
-from config import ProcessingError
+from ..config import ProcessingError
 
 logger = logging.getLogger(__name__)
 

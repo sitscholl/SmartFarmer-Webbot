@@ -49,8 +49,6 @@ def load_configuration():
     if Path(CREDENTIALS_ENV_FILE).exists():
         load_dotenv(CREDENTIALS_ENV_FILE)
         logger.debug(f"Loaded environment variables from {CREDENTIALS_ENV_FILE}")
-    else:
-        logger.warning(f"{CREDENTIALS_ENV_FILE} not found. Credentials must be set in the environment.")
 
     # --- Load YAML configuration file ---
     if not CONFIG_FILE_PATH.is_file():
@@ -81,8 +79,7 @@ def load_configuration():
             return default
 
     # --- General Settings ---
-    config['year'] = get_nested(yaml_config, ['general', 'year'])
-    config['log_level'] = get_nested(yaml_config, ['general', 'log_level'], 'INFO').upper()
+    config['year'] = yaml_config['general']['year']
 
     if not isinstance(config.get('year'), int):
          raise ConfigError("Invalid 'general.year' in config.yaml: must be an integer.")
@@ -95,16 +92,14 @@ def load_configuration():
     config['template_path'] = _resolve_path(project_root, paths_config.get('template_dir', 'templates'))
     config['google_creds_path'] = str(_resolve_path(project_root, paths_config.get('google_creds_file', 'gcloud_key.json')))
 
-    # Adjust user_dir path for Windows if it's relative *after* resolution attempt
+    # Adjust user_dir path for Windows if it's relative 
     if platform.system() == 'Windows' and not Path(config["user_dir"]).is_absolute():
-         # This case might be less common now with resolve(), but keep as fallback
         config["user_dir"] = str(Path.cwd() / config["user_dir"])
 
     # Create download directory if it doesn't exist
     Path(config["download_dir"]).mkdir(exist_ok=True, parents=True)
     logger.debug(f"Download directory set to: {config['download_dir']}")
     logger.debug(f"User directory set to: {config['user_dir']}")
-
 
     # --- Threshold Settings ---
     thresholds_config = get_nested(yaml_config, ['thresholds'], {})
@@ -117,16 +112,19 @@ def load_configuration():
     if not isinstance(config['default_days'], int): raise ConfigError("'thresholds.default_days' must be an integer.")
     if not isinstance(config['t1_factor'], (int, float)): raise ConfigError("'thresholds.t1_factor' must be a number.")
 
+    # --- Driver Settings ---
+    config['run_headless'] = yaml_config['driver'].get('headless', True)
+    config['simulate_slow_connection'] = yaml_config['driver'].get('slow_conn', False)
+
+    if not isinstance(config['run_headless'], bool): raise ConfigError("'smartfarmer.headless' must be true or false.")
+
 
     # --- SmartFarmer Settings & Credentials ---
     sm_config = get_nested(yaml_config, ['smartfarmer'], {})
-    config['run_headless'] = get_nested(sm_config, ['headless'], True)
     sm_user_env = get_nested(sm_config, ['username_env'], 'SM_USERNAME')
     sm_pwd_env = get_nested(sm_config, ['password_env'], 'SM_PASSWORD')
     config['sm_user'] = os.getenv(sm_user_env)
     config['sm_pwd'] = os.getenv(sm_pwd_env)
-
-    if not isinstance(config['run_headless'], bool): raise ConfigError("'smartfarmer.headless' must be true or false.")
 
 
     # --- SBR Settings & Credentials ---
@@ -151,7 +149,6 @@ def load_configuration():
 
 
     # --- Validate Essential Credentials ---
-    # Check *after* trying to load them
     required_credentials = {
         'sm_user': sm_user_env,
         'sm_pwd': sm_pwd_env,

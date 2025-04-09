@@ -8,7 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from ..utils.helpers import wait_for_page_stability, wait_for_download, temporary_implicit_wait
-from config import FetchError # Use custom exception
+from ..config import FetchError # Use custom exception
 
 logger = logging.getLogger(__name__)
 

@@ -16,7 +16,7 @@ def wait_for_download(download_dir, expected_filename=None, extension=None, time
     Waits for a file download to complete in the specified directory.
     Raises FetchError if the download times out or fails.
     """
-    from config import FetchError # Import locally to avoid circular dependency if helpers used elsewhere
+    from ..config import FetchError # Import locally to avoid circular dependency if helpers used elsewhere
 
     if not expected_filename and not extension:
         raise ValueError("Either expected_filename or extension must be provided.")

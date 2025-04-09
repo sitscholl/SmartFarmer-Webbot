@@ -1,7 +1,6 @@
 # General application settings
 general:
   year: 2025 # The primary year to process
-  log_level: INFO # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
 # Paths for data, templates, etc. (relative to project root or absolute)
 paths:
@@ -17,9 +16,12 @@ thresholds:
   default_days: 14    # Default treatment interval (days) if missing in static data
   t1_factor: 0.75     # Factor for calculating the lower warning threshold (T1)
 
+driver:
+  headless: true
+  slow_conn: false
+
 # SmartFarmer specific settings
 smartfarmer:
-  headless: true      # Run the browser in headless mode (true/false)
   # Names of environment variables holding the credentials
   username_env: SM_USERNAME
   password_env: SM_PASSWORD

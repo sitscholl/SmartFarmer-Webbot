@@ -1,53 +1,33 @@
-# plant_protection_report/main.py
 import logging
 import logging.config
 import sys
 import datetime # Keep this import
-from contextlib import ExitStack # For managing multiple resources
+from webhandler.SBR_requests import SBR
 
 # Load custom exceptions and config loader first
 # ConfigError is now defined in config.py
-from config import load_configuration, FetchError, ProcessingError, ReportError, ConfigError
+from src.config import load_configuration, FetchError, ProcessingError, ReportError, ConfigError
 
-# Import components (paths might need slight adjustment if you renamed spint)
-from spint.utils.web_driver import init_driver, close_driver
-from spint.clients.smartfarmer_client import SmartFarmerClient
-from spint.clients.sbr_client import SBRClient
-from spint.data_loaders.static_data import StaticDataLoader
-from spint.processing.data_processor import DataProcessor
-from spint.reporting.reporter import Reporter
-import pandas as pd # Import pandas here if needed
+from src.utils.web_driver import init_driver, close_driver
+from src.clients.smartfarmer_client import SmartFarmerClient
+#from src.clients.sbr_client import SBRClient
+from src.data_loaders.static_data import StaticDataLoader
+from src.processing.data_processor import DataProcessor
+from src.reporting.reporter import Reporter
+import pandas as pd
 
 # --- Setup Logging ---
-# Load basic config first, then try fileConfig, then potentially adjust level from YAML
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+##TODO: Move logging configuration to .yaml file and use dict-config
+logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger() # Get root logger
+logger.info("Successfully loaded logging configuration from .config/logging.conf")
 
-try:
-    # Load configuration early to potentially get log level
-    temp_config = load_configuration() # Load once to get log level
-    log_level_str = temp_config.get('log_level', 'INFO').upper()
-    log_level = getattr(logging, log_level_str, logging.INFO)
-    logger.info(f"Setting log level to {log_level_str} based on configuration.")
-    logger.setLevel(log_level) # Set level for root logger
-
-    # Now try loading the more detailed config file
-    logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
-    logger.info("Successfully loaded logging configuration from .config/logging.conf")
-
-    # Suppress noisy logs from libraries (apply AFTER fileConfig)
-    logging.getLogger("selenium").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
-    logging.getLogger("webdriver_manager").setLevel(logging.WARNING)
-    logging.getLogger("WDM").setLevel(logging.WARNING)
-    logging.getLogger("googleapiclient").setLevel(logging.WARNING) # If using sheets
-
-except ConfigError as e: # Catch config loading errors early
-     logger.critical(f"CRITICAL: Failed to load configuration: {e}. Exiting.")
-     sys.exit(1)
-except Exception as e:
-     logger.warning(f"Warning: Could not configure logging from file: {e}. Using level from config/basic setup.")
-     # Ensure level set previously from YAML/basic is retained if fileConfig fails
+# Suppress noisy logs from libraries (apply AFTER fileConfig)
+logging.getLogger("selenium").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("webdriver_manager").setLevel(logging.WARNING)
+logging.getLogger("WDM").setLevel(logging.WARNING)
+logging.getLogger("googleapiclient").setLevel(logging.WARNING) # If using sheets
 
 
 # --- Main Execution Logic ---
@@ -60,13 +40,13 @@ def run_report_generation():
 
     try:
         logger.info("--- Starting Pflanzenschutz Report Generation ---")
-        # Configuration is already loaded once for logging, load again or reuse temp_config
-        config = load_configuration() # Or config = temp_config if it's guaranteed valid
+        ##TODO: Simplify load_configuration function by removing get_nested calls?
+        config = load_configuration()
 
         # --- Initialize Components ---
         logger.info("Initializing components...")
         static_loader = StaticDataLoader(config['static_data_path'], config['t1_factor'])
-        # Driver initialization needs careful error handling
+        ##TODO: Transform init_driver in a class with __enter__and __exit__ methods to use as context manager. Can also be imported from webhandler
         try:
             driver = init_driver(
                 download_dir=config['download_dir'],
@@ -78,7 +58,6 @@ def run_report_generation():
             raise FetchError(f"WebDriver initialization failed: {e}") from e # Raise specific error
 
         sm_client = SmartFarmerClient(driver, config['sm_user'], config['sm_pwd'], config['download_dir'])
-        sbr_client = SBRClient(config['sbr_user'], config['sbr_pwd'])
         processor = DataProcessor(config, None) # Static data loaded later
         reporter_instance = Reporter(config) # Initialize reporter
         logger.info("Components initialized.")
@@ -95,14 +74,20 @@ def run_report_generation():
                     min_date = sm_dates.min()
                     # Ensure min_date is not NaT
                     if pd.notna(min_date):
-                         max_date = datetime.datetime.now()
-                         # Check if min_date has timezone, add if necessary (assuming Europe/Rome based on SBRClient)
-                         if min_date.tzinfo is None:
-                             min_date = min_date.tz_localize('Europe/Rome', ambiguous='infer')
-                         logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d')} to now.")
-                         sbr_data = sbr_client.fetch_weather_data(config['sbr_station_id'], min_date, max_date)
+                        max_date = datetime.datetime.now()
+                        # Check if min_date has timezone, add if necessary (assuming Europe/Rome based on SBRClient)
+                        if min_date.tzinfo is None:
+                            min_date = min_date.tz_localize('Europe/Rome', ambiguous='infer')
+                        logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d')} to now.")
+                        with SBR(config['sbr_user'], config['sbr_pwd']) as client:
+                            sbr_data = client.get_stationdata(
+                                station_id="103",
+                                start=min_date,
+                                end=max_date,
+                                type='meteo'
+                            )
                     else:
-                         logger.warning("Minimum date from SmartFarmer data is invalid (NaT). Skipping SBR fetch.")
+                        logger.warning("Minimum date from SmartFarmer data is invalid (NaT). Skipping SBR fetch.")
                 else:
                     logger.warning("No valid dates found in SmartFarmer data after conversion. Cannot determine SBR range.")
             except FetchError as e:
@@ -169,7 +154,7 @@ def run_report_generation():
 
         except Exception as mail_err:
             logger.error(f"Failed to send failure notification email: {mail_err}", exc_info=True)
-        exit_code = 1 # Indicate failure
+            exit_code = 1 # Indicate failure
     except Exception as e:
         logger.critical(f"An unexpected critical error occurred: {e}", exc_info=True)
         exit_code = 1 # Indicate failure

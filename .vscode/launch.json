@@ -10,15 +10,6 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["-j", "2025", "-he"]
-        },
-        {
-            "name": "Debug Browser (headless)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "args": ["-j", "2025"]
         }
     ]
 }

@@ -7,7 +7,7 @@ from email.message import EmailMessage
 import logging
 import datetime
 from pytz import timezone
-from config import ReportError
+from ..config import ReportError
 
 logger = logging.getLogger(__name__)
 
