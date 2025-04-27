@@ -1,6 +1,7 @@
 # General application settings
 general:
   year: 2025 # The primary year to process
+  timezone: Europe/Rome
 
 # Paths for data, templates, etc. (relative to project root or absolute)
 paths:

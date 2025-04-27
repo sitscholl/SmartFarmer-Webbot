@@ -68,11 +68,11 @@ def run_report_generation():
         else:
             sm_dates = pd.to_datetime(smartfarmer_data['Datum'], format="%d/%m/%Y", errors='coerce').dropna().sort_values()
             min_date = sm_dates.min()
-            max_date = datetime.datetime.now(tz=timezone('Europe/Rome'))
+            max_date = datetime.datetime.now(tz=timezone(config['general']['timezone']))
             
             # Check if min_date has timezone, add if necessary
             if min_date.tzinfo is None:
-                min_date = min_date.tz_localize('Europe/Rome')
+                min_date = min_date.tz_localize(config['general']['timezone'])
             
             try:
                 logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d %H:%M')} to {max_date.strftime('%Y-%m-%d %H:%M')}.")

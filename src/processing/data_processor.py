@@ -28,7 +28,7 @@ class DataProcessor:
             df['Datum'] = pd.to_datetime(df['Datum'], format="%d/%m/%Y", errors='coerce')
             # Make timezone aware (assume local timezone of data entry, e.g., Rome)
             # Or, if always naive, keep it naive: df['Datum'] = df['Datum'].dt.tz_localize(None)
-            df['Datum'] = df['Datum'].dt.tz_localize('Europe/Rome')
+            df['Datum'] = df['Datum'].dt.tz_localize(self.config['general']['timezone'])
 
             if df['Datum'].isnull().any():
                  logger.warning("Some 'Datum' values in SmartFarmer data failed conversion or were missing.")
@@ -249,8 +249,8 @@ class DataProcessor:
 
         # Make SBR datetime timezone aware to match treatments_df['Datum'] and current_time
         if sbr_df['Datum'].dt.tz is None:
-            logger.debug("Making SBR Datum timezone-aware (assuming Europe/Rome).")
-            sbr_df['Datum'] = sbr_df['Datum'].dt.tz_localize('Europe/Rome', ambiguous='infer')
+            logger.debug("Making SBR Datum timezone-aware.")
+            sbr_df['Datum'] = sbr_df['Datum'].dt.tz_localize(self.config['general']['timezone'], ambiguous='infer')
 
 
         # Prepare for merging/lookup: Sort SBR data by time
@@ -263,7 +263,7 @@ class DataProcessor:
         for start_date in unique_start_dates:
             # Ensure start_date is timezone aware for comparison
             if start_date.tzinfo is None:
-                 start_date = start_date.tz_localize('Europe/Rome') # Or infer from treatments_df
+                 start_date = start_date.tz_localize(self.config['general']['timezone']) # Or infer from treatments_df
 
             # Select relevant period from SBR data (inclusive start, exclusive end)
             # Add a small epsilon to start_date for > comparison if needed,
