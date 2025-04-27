@@ -38,6 +38,8 @@ gmail:
   # Names of environment variables holding the credentials
   username_env: GM_USERNAME
   password_env: GM_APPKEY
+  host: smtp.gmail.com
+  port: 465
   # List of email addresses to send the report to
   recipients:
     - "tscholl.simon@gmail.com"
