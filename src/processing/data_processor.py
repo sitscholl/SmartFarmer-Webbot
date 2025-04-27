@@ -1,4 +1,5 @@
 # spint/processing/data_processor.py
+from typing import Dict, Any, List
 import pandas as pd
 import numpy as np
 import datetime
@@ -7,47 +8,92 @@ from ..config import ProcessingError
 
 logger = logging.getLogger(__name__)
 
-class DataProcessor:
-    """Processes SmartFarmer and SBR data to generate the final report dataset."""
+# Constants
+RELEVANT_GRUND = [
+    "Apfelmehltau",
+    "Apfelschorf",
+    "Blattdüngung",
+    "Ca-Düngung",
+    "Bittersalz"
+]
 
-    def __init__(self, config, static_data):
+REQUIRED_COLUMNS = {
+    'smartfarmer': ['Datum', 'Mittel', 'Grund', 'Wiese', 'Sorte'],
+    'grouping': ['Wiese', 'Sorte', 'Mittel', 'Grund']
+}
+
+MITTEL_GRUND_MAPPING = {
+    "yaravita stopit": "Ca-Düngung",
+    "epso combitop": "Bittersalz",
+    "epso top": "Bittersalz",
+    "ats": "Chemisches Ausdünnen",
+    "supreme n": "Chemisches Ausdünnen"
+}
+
+class DataProcessor:
+    """Processes SmartFarmer and SBR data to generate the final report dataset.
+    
+    This class handles the processing of agricultural data, including data reformatting,
+    calculation of application dates, and threshold management.
+    """
+
+    def __init__(self, config: Dict[str, Any], static_data: Dict[str, pd.DataFrame]) -> None:
+        """Initialize the DataProcessor.
+        
+        Args:
+            config: Configuration dictionary containing processing parameters
+            static_data: Dictionary containing static reference data frames
+        """
         self.config = config
         self.static_data = static_data
-        self.current_time = datetime.datetime.now(datetime.timezone.utc).astimezone() # Timezone aware
+        self.current_time = datetime.datetime.now(datetime.timezone.utc).astimezone()  # Timezone aware
 
-    def _reformat_smartfarmer(self, sm_df):
-        """Initial reformatting of the raw SmartFarmer DataFrame."""
+    def _reformat_smartfarmer(self, sm_df: pd.DataFrame) -> pd.DataFrame:
+        """Initial reformatting of the raw SmartFarmer DataFrame.
+        
+        Performs several transformations on the input data:
+        1. Converts dates to timezone-aware datetime
+        2. Normalizes 'Grund' values based on 'Mittel'
+        3. Processes 'Anlage' field to extract 'Wiese' and 'Sorte'
+        4. Splits and filters 'Grund' values
+        
+        Args:
+            sm_df: Raw SmartFarmer DataFrame
+            
+        Returns:
+            Reformatted DataFrame with standardized columns
+            
+        Raises:
+            ProcessingError: If critical data processing steps fail
+        """
         logger.info("Reformatting SmartFarmer data...")
         if sm_df.empty:
-             logger.warning("SmartFarmer DataFrame is empty. Skipping reformatting.")
-             return sm_df
+            logger.warning("SmartFarmer DataFrame is empty. Skipping reformatting.")
+            return sm_df
 
         df = sm_df.copy()
         try:
             # Date Conversion
             df['Datum'] = pd.to_datetime(df['Datum'], format="%d/%m/%Y", errors='coerce')
-            # Make timezone aware (assume local timezone of data entry, e.g., Rome)
-            # Or, if always naive, keep it naive: df['Datum'] = df['Datum'].dt.tz_localize(None)
             df['Datum'] = df['Datum'].dt.tz_localize(self.config['general']['timezone'])
 
             if df['Datum'].isnull().any():
-                 logger.warning("Some 'Datum' values in SmartFarmer data failed conversion or were missing.")
-                 df.dropna(subset=['Datum'], inplace=True)
+                logger.warning("Some 'Datum' values in SmartFarmer data failed conversion or were missing.")
+                df.dropna(subset=['Datum'], inplace=True)
 
-
-            # Normalize 'Grund' based on 'Mittel' (Case-insensitive comparison)
-            # Ensure 'Mittel' and 'Grund' columns exist and are strings
+            # Normalize 'Grund' based on 'Mittel'
             if 'Mittel' in df.columns:
                 df['Mittel'] = df['Mittel'].astype(str)
                 mittel_lower = df['Mittel'].str.lower()
-                if 'Grund' not in df.columns: df['Grund'] = '' # Create if missing
+                if 'Grund' not in df.columns:
+                    df['Grund'] = ''
                 df['Grund'] = df['Grund'].astype(str)
 
-                df['Grund'] = np.where(mittel_lower.isin(["yaravita stopit"]), 'Ca-Düngung', df['Grund'])
-                df['Grund'] = np.where(mittel_lower.isin(["epso combitop", "epso top"]), 'Bittersalz', df['Grund'])
-                df['Grund'] = np.where(mittel_lower.isin(["ats", "supreme n"]), 'Chemisches Ausdünnen', df['Grund']) # Keep only relevant?
+                # Apply mappings from constant
+                for mittel, grund in MITTEL_GRUND_MAPPING.items():
+                    df['Grund'] = np.where(mittel_lower == mittel, grund, df['Grund'])
             else:
-                 logger.warning("'Mittel' column not found in SmartFarmer data. Cannot normalize 'Grund'.")
+                logger.warning("'Mittel' column not found in SmartFarmer data. Cannot normalize 'Grund'.")
 
 
             # Adjust 'Anlage' names and extract 'Wiese' and 'Sorte'
@@ -71,44 +117,55 @@ class DataProcessor:
 
             # Split and explode 'Grund' field
             if 'Grund' in df.columns:
-                df['Grund'] = df['Grund'].str.split(',\s*') # Split by comma and optional spaces
+                df['Grund'] = df['Grund'].str.split(',\s*')  # Split by comma and optional spaces
                 df = df.explode('Grund')
-                df['Grund'] = df['Grund'].str.strip() # Clean up whitespace
+                df['Grund'] = df['Grund'].str.strip()  # Clean up whitespace
                 # Filter for relevant Grund values after exploding
-                relevant_grund = ["Apfelmehltau", "Apfelschorf", "Blattdüngung", "Ca-Düngung", "Bittersalz"] # Add others if needed
-                df = df[df['Grund'].isin(relevant_grund)]
+                df = df[df['Grund'].isin(RELEVANT_GRUND)]
             else:
-                 logger.warning("'Grund' column not available for exploding.")
-
+                logger.warning("'Grund' column not available for exploding.")
 
             logger.info("SmartFarmer data reformatting complete.")
             # Select and return relevant columns
-            relevant_cols = ['Datum', 'Mittel', 'Grund', 'Wiese', 'Sorte']
-            return df[[col for col in relevant_cols if col in df.columns]]
+            available_cols = [col for col in REQUIRED_COLUMNS['smartfarmer'] if col in df.columns]
+            return df[available_cols]
 
+        except pd.errors.OutOfBoundsDatetime as e:
+            logger.error(f"Invalid date format in SmartFarmer data: {e}", exc_info=True)
+            raise ProcessingError(f"Invalid date format in SmartFarmer data: {e}") from e
+        except ValueError as e:
+            logger.error(f"Value error while processing SmartFarmer data: {e}", exc_info=True)
+            raise ProcessingError(f"Value error in SmartFarmer data: {e}") from e
         except Exception as e:
-            logger.error(f"Error reformatting SmartFarmer data: {e}", exc_info=True)
+            logger.error(f"Unexpected error reformatting SmartFarmer data: {e}", exc_info=True)
             raise ProcessingError(f"Failed to reformat SmartFarmer data: {e}") from e
 
 
-    def _calculate_last_dates(self, sm_df_reformatted):
-        """Calculates the last application date for each Wiese/Sorte/Grund/Mittel combination."""
+    def _calculate_last_dates(self, sm_df_reformatted: pd.DataFrame) -> pd.DataFrame:
+        """Calculates the last application date for each Wiese/Sorte/Grund/Mittel combination.
+        
+        Args:
+            sm_df_reformatted: Reformatted SmartFarmer DataFrame
+            
+        Returns:
+            DataFrame with last application dates and days passed
+            
+        Raises:
+            ProcessingError: If required columns are missing
+        """
         logger.info("Calculating last application dates...")
         if sm_df_reformatted.empty:
-             logger.warning("Reformatted SmartFarmer data is empty. Cannot calculate last dates.")
-             return pd.DataFrame() # Return empty df with expected columns later
+            logger.warning("Reformatted SmartFarmer data is empty. Cannot calculate last dates.")
+            return pd.DataFrame()  # Return empty df with expected columns later
 
-        # Group and find max date
-        group_cols = ['Wiese', 'Sorte', 'Mittel', 'Grund']
-        if not all(col in sm_df_reformatted.columns for col in group_cols):
-             missing = [col for col in group_cols if col not in sm_df_reformatted.columns]
-             raise ProcessingError(f"Cannot group SmartFarmer data, missing columns: {missing}")
+        # Verify required columns are present
+        group_cols = REQUIRED_COLUMNS['grouping']
+        missing = [col for col in group_cols if col not in sm_df_reformatted.columns]
+        if missing:
+            raise ProcessingError(f"Cannot group SmartFarmer data, missing columns: {missing}")
 
         last_dates = sm_df_reformatted.groupby(group_cols, as_index=False)['Datum'].max()
-
-        # Calculate days passed since last application (ensure timezone awareness)
         last_dates['Tage'] = (self.current_time - last_dates['Datum']).dt.days
-        # last_dates['Tage'] = np.floor((self.current_time - last_dates['Datum']) / pd.Timedelta(days=1))
 
         logger.info("Calculated last dates and days passed.")
         return last_dates
