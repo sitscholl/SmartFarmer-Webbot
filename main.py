@@ -3,38 +3,32 @@ import logging.config
 import sys
 import datetime
 from pytz import timezone
+import pandas as pd
 from webhandler.SBR_requests import SBR
 
-from src.config import load_configuration, FetchError, ProcessingError, ReportError, ConfigError
-
+from src.config import load_configuration
 from src.utils.web_driver import init_driver, close_driver
 from src.clients.smartfarmer_client import SmartFarmerClient
 from src.data_loaders.static_data import StaticDataLoader
 from src.processing.data_processor import DataProcessor
-from src.reporting.reporter import Reporter
-import pandas as pd
+from src.config import load_configuration
 
-# --- Setup Logging ---
-##TODO: Move logging configuration to .yaml file and use dict-config
-logging.config.fileConfig(".config/logging.conf", disable_existing_loggers=False)
-logger = logging.getLogger() # Get root logger
-logger.info("Successfully loaded logging configuration from .config/logging.conf")
-
-# Suppress noisy logs from libraries (apply AFTER fileConfig)
-logging.getLogger("selenium").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("webdriver_manager").setLevel(logging.WARNING)
-logging.getLogger("WDM").setLevel(logging.WARNING)
-logging.getLogger("googleapiclient").setLevel(logging.WARNING) # If using sheets
-
+from src.driver import Driver
+from src.clients.smartfarmer_client import SmartFarmerClient
 
 # --- Main Execution Logic ---
 def run_report_generation():
     """Main function to orchestrate the report generation process."""
+    config = None
+    reporter_instance = None
 
     try:
-        logger.info("--- Starting Pflanzenschutz Report Generation ---")
+        
         config = load_configuration('.config/config.yaml')
+
+        logging.config.dictConfig(config['logging'])
+        logger = logging.getLogger(__name__)
+        logger.info("--- Starting Pflanzenschutz Report Generation ---")
 
         # --- Initialize Components ---
         logger.info("Initializing components...")
@@ -42,49 +36,42 @@ def run_report_generation():
             config['paths']['static_data_path'], 
             config['thresholds']['t1_factor']
         )
-        ##TODO: Transform init_driver in a class with __enter__and __exit__ methods to use as context manager. Can also be imported from webhandler
-        try:
-            driver = init_driver(
-                download_dir=config['paths']['download_dir'],
-                user_dir=config['paths']['user_dir'],
-                headless=config['driver']['run_headless']
-            )
-        except Exception as e:
-            logger.critical(f"Failed to initialize WebDriver: {e}", exc_info=True)
-            raise FetchError(f"WebDriver initialization failed: {e}") from e
 
-        sm_client = SmartFarmerClient(
-            driver, 
-            config['sm_user'], 
-            config['sm_pwd'], 
-            config['paths']['download_dir']
-        )
+        # --- Fetch data ---
+        logger.info("--- Fetching Data ---")
+        with Driver(download_dir=config['paths']['download_dir'], user_dir=config['paths']['user_dir'], headless=config['driver']['run_headless']) as driver:
+
+            sm_client = SmartFarmerClient(
+                driver, 
+                config['sm_user'], 
+                config['sm_pwd'], 
+                config['paths']['download_dir']
+            )
+            
+            try:
+                smartfarmer_data = sm_client.fetch_report_data(config['general']['year'])
+            except Exception as e:
+                logger.critical(f"Failed to fetch SmartFarmer data: {e}")
+                raise
+            
         processor = DataProcessor(config, None) # Static data loaded later
         reporter_instance = Reporter(config) # Initialize reporter
         logger.info("Components initialized.")
-
-        # --- Fetch Data ---
-        logger.info("--- Fetching Data ---")
-        try:
-            smartfarmer_data = sm_client.fetch_report_data(config['general']['year'])
-        except Exception as e:
-            logger.critical(f"Failed to fetch SmartFarmer data: {e}")
-            raise
-
-        sm_dates = pd.to_datetime(smartfarmer_data['Datum'], format="%d/%m/%Y", errors='coerce').dropna().sort_values()
-        min_date = sm_dates.min()
-        max_date = datetime.datetime.now(tz = timezone('Europe/Rome'))
-        
-        # Check if min_date has timezone, add if necessary (assuming Europe/Rome based on SBRClient)
-        if min_date.tzinfo is None:
-            min_date = min_date.tz_localize('Europe/Rome')
         
         if smartfarmer_data.empty:
             logger.critical("SmartFarmer data is empty or missing 'Datum' column. Skipping SBR fetch.")
             sbr_data = None
         else:
-            try:             
-                logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d')} to now.")
+            sm_dates = pd.to_datetime(smartfarmer_data['Datum'], format="%d/%m/%Y", errors='coerce').dropna().sort_values()
+            min_date = sm_dates.min()
+            max_date = datetime.datetime.now(tz=timezone('Europe/Rome'))
+            
+            # Check if min_date has timezone, add if necessary
+            if min_date.tzinfo is None:
+                min_date = min_date.tz_localize('Europe/Rome')
+            
+            try:
+                logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d %H:%M')} to {max_date.strftime('%Y-%m-%d %H:%M')}.")
                 with SBR(config['sbr_user'], config['sbr_pwd']) as client:
                     sbr_data = client.get_stationdata(
                         station_id="103",
@@ -94,7 +81,7 @@ def run_report_generation():
                     )
             except Exception as e:
                 sbr_data = None
-                logger.critical(f"Failed to fetch SBR data: {e}. Proceeding without rainfall data.")
+                logger.warning(f"Failed to fetch SBR data: {e}. Proceeding without rainfall data.")
 
         logger.info("--- Data Fetching Complete ---")
 
@@ -139,10 +126,8 @@ def run_report_generation():
                 sys.exit(1)
 
     # --- Cleanup ---
-    finally:
-        logger.info("--- Cleaning up resources ---")
-        if driver:
-            close_driver(driver)
+    #finally:
+        #logger.info("--- Cleaning up resources ---")
 
 # --- Script Entry Point ---
 if __name__ == "__main__":
