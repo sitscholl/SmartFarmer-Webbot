@@ -102,28 +102,18 @@ def run_report_generation():
     except Exception as e:
         logger.critical(f"Report generation failed: {e}", exc_info=True)
         # Send failure notification email if possible
-        if config and reporter_instance:
+        if config:
             subject = f"FEHLER: Pflanzenschutz Report Generation Failed - {datetime.date.today().strftime('%Y-%m-%d')}"
             body = f"<h1>Report Generation Failed</h1><p><strong>Error Type:</strong> {type(e).__name__}</p><p><strong>Message:</strong> {e}</p><p>Check application logs for details.</p>"
-            
-            from email.message import EmailMessage
-            import smtplib
-
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg['From'] = config['gm_user']
-            msg['To'] = ", ".join(config.get('email_recipients', []))
-            msg.set_content("Report generation failed. Please check logs. Enable HTML for details.")
-            msg.add_alternative(body, subtype="html")
-
-            if config.get('gm_user') and config.get('gm_pwd') and config.get('email_recipients'):
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
-                    smtp_server.login(config['gm_user'], config['gm_pwd'])
-                    smtp_server.send_message(msg)
-                logger.info("Sent failure notification email.")
-            else:
-                logger.warning("Could not send failure email: Gmail config incomplete.")
-                sys.exit(1)
+            send_mail(
+                subject = subject,
+                content = body,
+                recipients = ['tscholl.simon@gmail.com'],
+                host = config['gmail']['host'],
+                port = config['gmail']['port'],
+                username = config['gmail']['username'],
+                password = config['gmail']['password']
+            )
 
     # --- Cleanup ---
     #finally:
