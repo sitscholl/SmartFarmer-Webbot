@@ -19,29 +19,30 @@ class StaticDataLoader:
         """Loads and prepares rainfall resistance data."""
         file_path = self.data_path / "regenbestaendigkeit.csv"
         logger.debug(f"Loading Regenbestaendigkeit from: {file_path}")
+
         try:
             df = pd.read_csv(file_path, encoding="latin-1")
-            # Rename directly to standard names
             df = df.rename(columns={"Regenbestaendigkeit": "Regenbestaendigkeit_max"})
             if "Regenbestaendigkeit_max" not in df.columns:
                 raise ValueError("Column 'Regenbestaendigkeit' not found in regenbestaendigkeit.csv")
 
             # Calculate min threshold
-            df["Regenbestaendigkeit_min"] = (df["Regenbestaendigkeit_max"] * self.t1_factor).round(1) # Allow decimals maybe?
+            df["Regenbestaendigkeit_min"] = (df["Regenbestaendigkeit_max"] * self.t1_factor).round(1)
             logger.info(f"Loaded Regenbestaendigkeit data. Shape: {df.shape}")
-            return df[['Mittel', 'Regenbestaendigkeit_min', 'Regenbestaendigkeit_max']] # Select needed columns
+            return df[['Mittel', 'Regenbestaendigkeit_min', 'Regenbestaendigkeit_max']]
+
         except FileNotFoundError:
             logger.error(f"File not found: {file_path}")
             raise
         except Exception as e:
             logger.error(f"Error loading Regenbestaendigkeit data: {e}", exc_info=True)
-            raise ProcessingError(f"Failed to load {file_path}: {e}") from e
-
+            raise
 
     def load_sortenanfaelligkeit(self):
         """Loads variety susceptibility data."""
         file_path = self.data_path / "sortenanfaelligkeit.csv"
         logger.debug(f"Loading Sortenanfälligkeit from: {file_path}")
+
         try:
             df = pd.read_csv(file_path, encoding="latin-1")
             logger.info(f"Loaded Sortenanfälligkeit data. Shape: {df.shape}")
@@ -49,28 +50,29 @@ class StaticDataLoader:
             if not {'Sorte', 'Mehltauanfälligkeit'}.issubset(df.columns):
                  raise ValueError("sortenanfaelligkeit.csv missing required columns 'Sorte' or 'Mehltauanfälligkeit'")
             return df
+
         except FileNotFoundError:
             logger.error(f"File not found: {file_path}")
             raise
         except Exception as e:
             logger.error(f"Error loading Sortenanfälligkeit data: {e}", exc_info=True)
-            raise ProcessingError(f"Failed to load {file_path}: {e}") from e
+            raise
 
     def load_behandlungsintervall(self, sortenanfaelligkeit_df):
         """Loads and prepares treatment interval data, merging with susceptibility."""
         file_path = self.data_path / "behandlungsintervall.csv"
         logger.debug(f"Loading Behandlungsintervall from: {file_path}")
+
         try:
-            df = pd.read_csv(file_path, encoding="latin-1", sep="\t") # Assuming tab separated based on load.py
+            df = pd.read_csv(file_path, encoding="latin-1", sep="\t")
             logger.info(f"Loaded Behandlungsintervall data. Shape: {df.shape}")
 
-             # Filter based on season (determine season once)
+             # Filter based on season
             current_month = datetime.datetime.now().month
-            # Adjust logic if needed (e.g., <= 5 for Vorblüte)
             season = 'Vorblüte' if current_month <= 6 else 'Sommer'
             logger.info(f"Filtering Behandlungsintervall for season: {season}")
 
-            # Apply filtering (Nimrod example)
+            # Apply filtering
             df_filtered = df[
                 (df["Mittel"] != "Nimrod 250 EW") | (df["Jahreszeit"] == season)
             ].copy() # Use copy to avoid SettingWithCopyWarning
@@ -80,12 +82,10 @@ class StaticDataLoader:
                 # Return an empty DataFrame with expected columns to avoid downstream errors
                 return pd.DataFrame(columns=['Mittel', 'Sorte', 'Behandlungsintervall_min', 'Behandlungsintervall_max'])
 
-
             # Validate required columns before melt
             required_melt_cols = ["Mittel", "Jahreszeit", "Range"]
             if not all(col in df_filtered.columns for col in required_melt_cols):
                 raise ValueError(f"behandlungsintervall.csv missing required columns for melting: {required_melt_cols}")
-
 
             # Melt and merge
             id_vars = ["Mittel", "Jahreszeit", "Range"]
@@ -95,7 +95,7 @@ class StaticDataLoader:
 
             df_melted = df_filtered.melt(
                 id_vars=id_vars,
-                value_vars=value_vars, # Use dynamic columns
+                value_vars=value_vars,
                 var_name="Mehltauanfälligkeit",
                 value_name="Behandlungsintervall",
             )
@@ -150,7 +150,7 @@ class StaticDataLoader:
             raise
         except Exception as e:
             logger.error(f"Error loading or processing Behandlungsintervall data: {e}", exc_info=True)
-            raise ProcessingError(f"Failed to process {file_path}: {e}") from e
+            raise
 
     def load_all(self):
         """Loads all static data required."""
