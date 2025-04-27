@@ -12,6 +12,7 @@ from src.clients.smartfarmer_client import SmartFarmerClient
 from src.data_loaders.static_data import StaticDataLoader
 from src.processing.data_processor import DataProcessor
 from src.config import load_configuration
+from src.google import send_mail
 
 from src.driver import Driver
 from src.clients.smartfarmer_client import SmartFarmerClient
