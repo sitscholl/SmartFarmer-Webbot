@@ -43,7 +43,7 @@ def load_configuration(CONFIG_FILE_PATH):
         logger.debug(f"Loaded environment variables from {CREDENTIALS_ENV_FILE}")
 
     # --- Load YAML configuration file ---
-    if not CONFIG_FILE_PATH.is_file():
+    if not Path(CONFIG_FILE_PATH).is_file():
         raise ConfigError(f"Configuration file not found: {CONFIG_FILE_PATH}")
 
     try:
@@ -57,13 +57,13 @@ def load_configuration(CONFIG_FILE_PATH):
          raise ConfigError("Invalid 'general.year' in config.yaml: must be an integer.")
 
     # Adjust user_dir path for Windows if it's relative 
-    if platform.system() == 'Windows' and not Path(config['Path']["user_dir"]).is_absolute():
-        config['Path']["user_dir"] = str(Path.cwd() / config['Path']["user_dir"])
+    if platform.system() == 'Windows' and not Path(config['paths']["user_dir"]).is_absolute():
+        config['paths']["user_dir"] = str(Path.cwd() / config['paths']["user_dir"])
 
     # Create download directory if it doesn't exist
-    Path(config['Path']["download_dir"]).mkdir(exist_ok=True, parents=True)
-    logger.debug(f"Download directory set to: {config['Path']['download_dir']}")
-    logger.debug(f"User directory set to: {config['Path']['user_dir']}")
+    Path(config['paths']["download_dir"]).mkdir(exist_ok=True, parents=True)
+    logger.debug(f"Download directory set to: {config['paths']['download_dir']}")
+    logger.debug(f"User directory set to: {config['paths']['user_dir']}")
 
     # --- Validate thresholds ---
     if not isinstance(config["thresholds"]['default_mm'], (int, float)):
@@ -74,22 +74,22 @@ def load_configuration(CONFIG_FILE_PATH):
         raise ConfigError("'thresholds.t1_factor' must be a number.")
 
 
-    if not isinstance(config['driver']['run_headless'], bool):
+    if not isinstance(config['driver']['headless'], bool):
         raise ConfigError("'driver.headless' must be true or false.")
 
     # --- SmartFarmer Settings & Credentials ---
-    config['sm_user'] = os.getenv(config['smartfarmer']['SM_USERNAME'])
-    config['sm_pwd'] = os.getenv(config['smartfarmer']['SM_PASSWORD'])
+    config['sm_user'] = os.getenv(config['smartfarmer']['username_env'])
+    config['sm_pwd'] = os.getenv(config['smartfarmer']['password_env'])
 
     # --- SBR Settings & Credentials ---
-    config['sbr_user'] = os.getenv(config['sbr']['SBR_USERNAME'])
-    config['sbr_pwd'] = os.getenv(config['sbr']['SBR_PASSWORD'])
+    config['sbr_user'] = os.getenv(config['sbr']['username_env'])
+    config['sbr_pwd'] = os.getenv(config['sbr']['password_env'])
 
     # --- Gmail Settings & Credentials ---
-    config['gm_user'] = os.getenv(config['gmail']['GM_USERNAME'])
-    config['gm_pwd'] = os.getenv(config['gmail']['GM_APPKEY'])
+    config['gm_user'] = os.getenv(config['gmail']['username_env'])
+    config['gm_pwd'] = os.getenv(config['gmail']['password_env'])
 
-    if not isinstance(config['gmail']['email_recipients'], list):
+    if not isinstance(config['gmail']['recipients'], list):
          raise ConfigError("'gmail.recipients' must be a list of email addresses.")
 
     return config

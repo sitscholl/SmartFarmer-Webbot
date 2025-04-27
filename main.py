@@ -1,21 +1,18 @@
 import logging
 import logging.config
-import sys
 import datetime
 from pytz import timezone
 import pandas as pd
+from pathlib import Path
 from webhandler.SBR_requests import SBR
 
 from src.config import load_configuration
-from src.utils.web_driver import init_driver, close_driver
 from src.clients.smartfarmer_client import SmartFarmerClient
 from src.data_loaders.static_data import StaticDataLoader
 from src.processing.data_processor import DataProcessor
-from src.config import load_configuration
 from src.google import send_mail
-
 from src.driver import Driver
-from src.clients.smartfarmer_client import SmartFarmerClient
+from src.reporting.reporter import Reporter
 
 # --- Main Execution Logic ---
 def run_report_generation():
@@ -33,19 +30,24 @@ def run_report_generation():
 
         # --- Initialize Components ---
         logger.info("Initializing components...")
+        ##TODO: Make sure default_mm and default_days are used
         static_loader = StaticDataLoader(
-            config['paths']['static_data_path'], 
+            Path(config['paths']['static_data_dir']),
             config['thresholds']['t1_factor']
         )
 
         # --- Fetch data ---
         logger.info("--- Fetching Data ---")
-        with Driver(download_dir=config['paths']['download_dir'], user_dir=config['paths']['user_dir'], headless=config['driver']['run_headless']) as driver:
+        with Driver(
+            download_dir=config['paths']['download_dir'],
+            user_dir=config['paths']['user_dir'],
+            headless=config['driver']['headless']
+            ) as driver:
 
             sm_client = SmartFarmerClient(
-                driver, 
-                config['sm_user'], 
-                config['sm_pwd'], 
+                driver,
+                config['sm_user'],
+                config['sm_pwd'],
                 config['paths']['download_dir']
             )
             
