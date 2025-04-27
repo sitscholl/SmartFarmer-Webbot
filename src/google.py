@@ -6,17 +6,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def send_mail(msg_html, user, pwd, recipients = 'tscholl.simon@gmail.com'):
+def send_mail(
+    content: str,
+    username: str,
+    password: str,
+    recipients: list[str],
+    subject: str = 'Pflanzenschutz Übersicht',
+    fromaddr: str = 'tscholl.simon@gmail.com',
+    port = 465,
+    host = 'smtp.gmail.com'):
 
     msg = EmailMessage()
-    msg["Subject"] = 'Pflanzenschutz Übersicht'
-    msg['From'] = 'tscholl.simon@gmail.com'
-    msg['To'] = recipients# 'tscholl.simon@gmail.com, erlhof.latsch@gmail.com'
 
-    msg.set_content(msg_html, subtype="html")
+    msg["Subject"] = subject
+    msg['From'] = fromaddr
+    msg['To'] = recipients
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp_server:
-        smtp_server.login(user, pwd)
+    msg.set_content(content, subtype="html")
+
+    with smtplib.SMTP_SSL(host, port) as smtp_server:
+        smtp_server.login(username, password)
         smtp_server.send_message(msg)
 
     logger.info('Email versendet!')
