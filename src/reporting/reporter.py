@@ -16,7 +16,7 @@ class Reporter:
 
     def __init__(self, config):
         self.config = config
-        self.template_path = config['template_path']
+        self.template_path = config['path']['template_path']
         self.email_recipients = config['email_recipients']
         self.gm_user = config['gm_user']
         self.gm_pwd = config['gm_pwd']

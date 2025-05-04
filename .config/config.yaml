@@ -5,7 +5,7 @@ general:
 
 paths:
   static_data_dir: "data"         # Location of static CSV files
-  template_dir: "templates"       # Location of Jinja2 templates
+  template_path: "templates/mail.html"       # Location of Jinja2 templates
   google_creds_file: "gcloud_key.json" # Path to Google Cloud service account key
 
 # Thresholds and default values for processing
