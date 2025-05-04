@@ -27,6 +27,8 @@ def run_report_generation():
         
         logging.config.dictConfig(config['logging'])
         logger = logging.getLogger(__name__)
+        logging.getLogger("selenium").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
         logger.info("--- Starting Pflanzenschutz Report Generation ---")
 
         # --- Initialize Components ---
@@ -40,8 +42,8 @@ def run_report_generation():
         # --- Fetch data ---
         logger.info("--- Fetching Data ---")
         with Driver(
-            download_dir=config['paths']['download_dir'],
-            user_dir=config['paths']['user_dir'],
+            download_dir=config['driver'].get('download_dir'),
+            user_dir=config['driver'].get('user_dir'),
             headless=config['driver']['headless']
             ) as driver:
 
@@ -49,7 +51,7 @@ def run_report_generation():
                 driver,
                 config['smartfarmer']['user'],
                 config['smartfarmer']['pwd'],
-                config['paths']['download_dir']
+                config['driver'].get('download_dir')
             )
             
             try:
