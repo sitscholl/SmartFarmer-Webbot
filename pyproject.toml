@@ -11,9 +11,5 @@ dependencies = [
     "pyyaml>=6.0.2",
     "selenium>=4.31.0",
     "webdriver-manager>=4.0.2",
-    "webhandler",
     "xlsx2csv>=0.8.4",
 ]
-
-[tool.uv.sources]
-webhandler = { path = "../WebHandler" }

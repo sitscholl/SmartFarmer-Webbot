@@ -4,8 +4,6 @@ general:
   env_file: 'credentials.env'
 
 paths:
-  download_dir: "downloads"       # Default directory for browser downloads
-  user_dir: "user_dir"            # Chrome user profile directory
   static_data_dir: "data"         # Location of static CSV files
   template_dir: "templates"       # Location of Jinja2 templates
   google_creds_file: "gcloud_key.json" # Path to Google Cloud service account key
@@ -19,6 +17,8 @@ thresholds:
 driver:
   headless: true
   slow_conn: false
+  download_dir: downloads      # Default directory for browser downloads
+  user_dir: user_dir           # Chrome user profile directory
 
 smartfarmer:
   username_env: SM_USERNAME
