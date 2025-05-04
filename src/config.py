@@ -51,7 +51,8 @@ def load_configuration(config_file_path):
     # Create download directory if it doesn't exist
     download_dir = config['driver'].get('download_dir')
     if download_dir:
-        Path(config['driver']["download_dir"]).mkdir(exist_ok=True, parents=True)
+        Path(download_dir).mkdir(exist_ok=True, parents=True)
+        config['driver']["download_dir"] = str(Path.cwd() / download_dir)
         logger.debug(f"Download directory set to: {config['driver']['download_dir']}")
 
     # Adjust user_dir path for Windows if it's relative
@@ -59,7 +60,7 @@ def load_configuration(config_file_path):
     if user_dir:
         if platform.system() == 'Windows' and not Path(user_dir).is_absolute():
             config['driver']["user_dir"] = str(Path.cwd() / config['driver']["user_dir"])
-        logger.debug(f"User_dir set to: {user_dir}")
+        logger.debug(f"User_dir set to: {config['driver']["user_dir"]}")
 
     # --- Validate thresholds ---
     if not isinstance(config["thresholds"]['default_mm'], (int, float)):
