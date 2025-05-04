@@ -1,9 +1,8 @@
-# General application settings
 general:
   year: 2025 # The primary year to process
   timezone: Europe/Rome
+  env_file: 'credentials.env'
 
-# Paths for data, templates, etc. (relative to project root or absolute)
 paths:
   download_dir: "downloads"       # Default directory for browser downloads
   user_dir: "user_dir"            # Chrome user profile directory
@@ -21,30 +20,24 @@ driver:
   headless: true
   slow_conn: false
 
-# SmartFarmer specific settings
 smartfarmer:
-  # Names of environment variables holding the credentials
   username_env: SM_USERNAME
   password_env: SM_PASSWORD
 
-# SBR (Beratungsring) specific settings
 sbr:
-  station_id: "103"   # Weather station ID to use
-  # Names of environment variables holding the credentials
+  station_id: "103"
   username_env: SBR_USERNAME
   password_env: SBR_PASSWORD
 
 # Gmail settings for sending reports
 gmail:
-  # Names of environment variables holding the credentials
   username_env: GM_USERNAME
   password_env: GM_APPKEY
   host: smtp.gmail.com
   port: 465
-  # List of email addresses to send the report to
   recipients:
     - "tscholl.simon@gmail.com"
-    # - "erlhof.latsch@gmail.com" # Add more recipients here
+    # - "erlhof.latsch@gmail.com"
 
 # Google Sheets settings (optional)
 # google_sheets:

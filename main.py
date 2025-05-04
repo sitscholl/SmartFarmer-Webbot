@@ -21,10 +21,10 @@ def run_report_generation():
     config = None
     reporter_instance = None
 
+    config = load_configuration('.config/config.yaml')
+
     try:
         
-        config = load_configuration('.config/config.yaml')
-
         logging.config.dictConfig(config['logging'])
         logger = logging.getLogger(__name__)
         logger.info("--- Starting Pflanzenschutz Report Generation ---")
@@ -47,8 +47,8 @@ def run_report_generation():
 
             sm_client = SmartFarmerClient(
                 driver,
-                config['sm_user'],
-                config['sm_pwd'],
+                config['smartfarmer']['user'],
+                config['smartfarmer']['pwd'],
                 config['paths']['download_dir']
             )
             
@@ -76,7 +76,7 @@ def run_report_generation():
             
             try:
                 logger.info(f"Fetching SBR data from {min_date.strftime('%Y-%m-%d %H:%M')} to {max_date.strftime('%Y-%m-%d %H:%M')}.")
-                with SBR(config['sbr_user'], config['sbr_pwd']) as client:
+                with SBR(config['sbr']['user'], config['sbr']['pwd']) as client:
                     sbr_data = client.get_stationdata(
                         station_id="103",
                         start=min_date,
@@ -115,8 +115,8 @@ def run_report_generation():
                 recipients = ['tscholl.simon@gmail.com'],
                 host = config['gmail']['host'],
                 port = config['gmail']['port'],
-                username = config['gmail']['username'],
-                password = config['gmail']['password']
+                username = config['gmail']['user'],
+                password = config['gmail']['pwd']
             )
 
     # --- Cleanup ---
